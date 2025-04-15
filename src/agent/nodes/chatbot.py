@@ -37,7 +37,7 @@ def chatbot(state: BaseGraphState) -> Command[Literal[END, N.CDS_FORECAST_SUBGRA
     
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
         
-        # DOC: get the first tool call, discard others (this is ugly asf) edit: this works btw ("get spi and compare with temp" > cds tool then spi tool then code editor tool (don't know why it works))
+        # DOC: get the first tool call, discard others (this is ugly asf) edit: this works btw → i.e.: "get spi and compare with temp" will call cds-tool then call spi-tool then call code-editor-tool (don't know why it works))
         tool_call = ai_message.tool_calls[0]
         ai_message.tool_calls = [tool_call] 
         
