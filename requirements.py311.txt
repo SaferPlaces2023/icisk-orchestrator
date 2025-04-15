@@ -1,0 +1,10 @@
+# LANGGRAPH
+openai
+langgraph
+langchain-anthropic
+langchain-openai
+langgraph-cli[inmem]
+
+# GENERAL
+nbformat
+python-dateutil
