@@ -2,8 +2,10 @@ import nest_asyncio; nest_asyncio.apply()
 import asyncio
 import streamlit as st
 
-import utils
-import langgraph_interface as lgi
+from webapp import utils
+from webapp import langgraph_interface as lgi
+
+# from ..session import SimpleSessionManager
 
 
 # REGION: Classes -------------------------------------------------------------
@@ -142,6 +144,13 @@ if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
         
         
 with st.sidebar:
+    
+    with st.expander("📁 Session files"):
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            file_uploader = st.file_uploader("Upload", label_visibility="collapsed")
+        with col2:
+            send_button = st.button("Send")
     
     # INFO: First sidebar element (Will be used for displaying generated code)
     with st.expander("💻 Code generated"):

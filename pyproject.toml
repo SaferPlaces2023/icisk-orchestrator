@@ -1,5 +1,5 @@
 [project]
-name = "agent"
+name = "icisk_orchestrator"
 version = "0.0.1"
 description = "Starter template for making a new agent LangGraph."
 authors = [
@@ -33,10 +33,12 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["langgraph.templates.agent", "agent"]
+packages = ["langgraph.templates.agent", "agent", "webapp", "session"]
 [tool.setuptools.package-dir]
-"langgraph.templates.agent" = "src/agent"
-"agent" = "src/agent"
+"langgraph.templates.agent" = "src/icisk_orchestrator/agent"
+"agent" = "src/icisk_orchestrator/agent"
+"webapp" = "src/icisk_orchestrator/webapp"
+"session" = "src/icisk_orchestrator/session"
 
 
 [tool.setuptools.package-data]

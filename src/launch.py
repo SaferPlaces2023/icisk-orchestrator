@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # DOC: Run langgraph server
     run_langraph_commands = [
         f"cd {os.getcwd()}",
-        f"langgraph dev --config src/agent/langgraph.json"
+        f"langgraph dev --config src/icisk_orchestrator/agent/langgraph.json"
     ]
     run_langraph = " && ".join(run_langraph_commands)
     
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # DOC: Run streamlit server
     run_streamlit_commands = [
         f"cd {os.getcwd()}",
-        "streamlit run src/webapp/app.py"
+        "streamlit run src/icisk_orchestrator/webapp/app.py"
     ]
     run_streamlit = " && ".join(run_streamlit_commands)
     
