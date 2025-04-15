@@ -9,8 +9,19 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
 dependencies = [
+    "openai",
     "langgraph>=0.2.6",
+    "langchain-anthropic",
+    "langchain-openai",
+    "langgraph-cli[inmem]",
+    
+    "asyncio",
+    "nest-asyncio",
+    "streamlit",
+
     "python-dotenv>=1.0.1",
+    "nbformat",
+    "python-dateutil"
 ]
 
 
