@@ -20,13 +20,13 @@ cds_forecast_notebook_tool = CDSForecastNotebookTool()
 spi_calculation_notebook_tool = SPICalculationNotebookTool()
 base_code_editor_tool = CodeEditorTool()
 
-multi_agent_tools = {
+tools_map = {
     cds_forecast_notebook_tool.name : cds_forecast_notebook_tool,
     spi_calculation_notebook_tool.name : spi_calculation_notebook_tool,
     base_code_editor_tool.name : base_code_editor_tool
 }
 
-llm_with_tools = utils._base_llm.bind_tools([tool for tool in multi_agent_tools.values()])
+llm_with_tools = utils._base_llm.bind_tools([tool for tool in tools_map.values()])
 
 
 
