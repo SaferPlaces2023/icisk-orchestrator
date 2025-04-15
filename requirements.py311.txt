@@ -1,3 +1,7 @@
+# GENERAL
+nbformat
+python-dateutil
+
 # LANGGRAPH
 openai
 langgraph
@@ -5,6 +9,7 @@ langchain-anthropic
 langchain-openai
 langgraph-cli[inmem]
 
-# GENERAL
-nbformat
-python-dateutil
+# WEBAPP
+asyncio
+nest-asyncio
+streamlit
