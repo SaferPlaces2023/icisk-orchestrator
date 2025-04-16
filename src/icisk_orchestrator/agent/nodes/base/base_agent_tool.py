@@ -1,4 +1,6 @@
 from typing import Optional
+from typing_extensions import Annotated
+from langgraph.prebuilt import InjectedState
 from langchain_core.tools import BaseTool
 from langchain_core.tools.base import ArgsSchema
 from langchain_core.callbacks import (
@@ -19,6 +21,7 @@ class BaseAgentTool(BaseTool):
     return_direct: bool = True
     
     # DOC: Additional args
+    graph_state: dict = None
     execution_confirmed: bool = False
     output_confirmed: bool = False
     output: dict = None
@@ -99,7 +102,7 @@ class BaseAgentTool(BaseTool):
                 }
             )
             
-            
+    # DOC: Confirm output if needed      
     def confirm_ouputs(self, tool_args):
         if not self.output_confirmed:
             raise BaseToolInterrupt(
@@ -120,8 +123,8 @@ class BaseAgentTool(BaseTool):
     # DOC: Run tool with the given arguments, this function should be overridden by the user that will call super() to do args validation and confirmation
     def _run(
         self, 
-        run_manager: None | Optional[CallbackManagerForToolRun] = None,
         tool_args: dict = None,
+        run_manager: None | Optional[CallbackManagerForToolRun] = None
     ) -> dict:
         """Run the tool with the given arguments."""
         

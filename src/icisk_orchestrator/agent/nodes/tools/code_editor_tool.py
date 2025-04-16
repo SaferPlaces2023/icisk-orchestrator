@@ -22,11 +22,11 @@ class CodeEditorTool(BaseAgentTool):
         
         source: None | str = Field(
             title = "Source",
-            description = "The path to the code file to be edited. It could be a python notebbok, a script.py. If not specified use None as default.",
+            description = "The filename of the code file to be edited. It is only filename.ext, without any other parent path. It could be a python notebbok, a script.py. If not specified use None as default.",
             examples = [
                 None,
-                'C:/path/to/python_script.py',
-                'C:/path/to/python_notebook.ipynb'
+                'python_script.py',
+                'python_notebook.ipynb'
             ],
             default=None
         )
@@ -54,6 +54,10 @@ class CodeEditorTool(BaseAgentTool):
         self.execution_confirmed = True     # INFO: Skip this, there will be output_confirmed:True
         
     
+    # def get_source_path(self, source):
+    #     source_path = os.path.join('src', 'icisk_orchestrator', 'session', 'files', source)
+    #     return source_path
+    
     def _set_args_validation_rules(self):
         return {
             'source': [
@@ -68,6 +72,8 @@ class CodeEditorTool(BaseAgentTool):
         source: None | str,
         code_request: None | str | list[str],
     ):
+        
+        # source_path = self.get_source_path(source)
         
         def get_source_code():
             if source.endswith('.ipynb'):

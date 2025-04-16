@@ -126,14 +126,10 @@ class BaseToolInterruptInvalidArgsHandler(BaseToolInterruptHandler):
         interrupt_message = self._generate_interrupt_message()
         interruption = interrupt({
             "content": interrupt_message,
-            "interrupt_type": BaseToolInterrupt.BaseToolInterruptType.PROVIDE_ARGS
+            "interrupt_type": BaseToolInterrupt.BaseToolInterruptType.INVALID_ARGS
         })
         response = interruption.get('response', 'User did not provide any response.')
         provided_args = self._generate_provided_args(response)
-        
-        print('\n\n')
-        print(f'Provided args: {provided_args}')
-        print('\n\n')
         
         self.tool_message.tool_calls[-1]["args"].update(provided_args)
         
@@ -349,7 +345,7 @@ class BaseToolInterruptNode:
     def setup(self):
         
         # DOC: This is a template function that will be used to create the tool interrupt node function.
-        def tool_interrupt_node_template(state):
+        def tool_interrupt_node_template(state):            
             interrupt_data = state['nodes_params'][self.tool_interrupt_node_name]
             tool_interrupt = interrupt_data['tool_interrupt']
             tool_name = interrupt_data['tool_interrupt']['tool']
@@ -358,6 +354,7 @@ class BaseToolInterruptNode:
             
             # DOC: OP.1 — i.e. BaseToolInterruptProvideArgsHandler.handle() -> _generate_interrupt_message > _generate_provided_args > _update_tool_message > return Command(goto=tool_handler_node, update={'messages' [tool_message]}
             # DOC: OP.2 — i.e. A generic class with handle method that return {'goto': node-name, 'update': state}
+            
             command = self.tool_interupt_handlers[tool_interrupt['type']].handle(tool, interrupt_data)
             
             next_node = command['goto']

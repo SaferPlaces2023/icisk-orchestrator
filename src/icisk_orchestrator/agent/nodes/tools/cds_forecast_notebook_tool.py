@@ -4,6 +4,9 @@ from dateutil import relativedelta
 from enum import Enum
 
 from typing import Optional
+from typing_extensions import Annotated
+from langgraph.prebuilt import InjectedState
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
@@ -13,6 +16,8 @@ from langchain_core.callbacks import (
 from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
+
+from db import DBI
 
 import nbformat as nbf
 
@@ -139,7 +144,9 @@ class CDSForecastNotebookTool(BaseAgentTool):
         )
         
     # DOC: Additional tool args
-    notebook: nbf.NotebookNode = nbf.v4.new_notebook()
+    notebook: dict = {
+        'source': nbf.v4.new_notebook()
+    }
 
     
     # DOC: Initialize the tool with a name, description and args_schema
@@ -250,10 +257,14 @@ class CDSForecastNotebookTool(BaseAgentTool):
     
     # DOC: Preapre notebook cell code template
     def prepare_notebook(self, jupyter_notebook):
-        if os.path.exists(jupyter_notebook):
-            self.notebook = nbf.read(jupyter_notebook, as_version=4)
+        existing_jupyter_notebook = DBI.notebook_by_name(jupyter_notebook, retrieve_source=True)
+        if existing_jupyter_notebook is not None:
+            self.notebook = existing_jupyter_notebook
+            self.notebook['source'] = nbf.reads(existing_jupyter_notebook['source'], as_version=4)
+        # if os.path.exists(jupyter_notebook):
+        #     self.notebook = nbf.read(jupyter_notebook, as_version=4)
         
-        self.notebook.cells.extend([
+        self.notebook['source'].cells.extend([
             nbf.v4.new_code_cell("""
                 # Section "Dependencies"
 
@@ -438,10 +449,16 @@ class CDSForecastNotebookTool(BaseAgentTool):
             'cds_varname': self.InputForecastVariable(forecast_variables[0]).as_cds,
             'icisk_varname': self.InputForecastVariable(forecast_variables[0]).as_icisk,
         }
-        for cell in self.notebook.cells:
+        for cell in self.notebook['source'].cells:
             if cell.cell_type in ("markdown", "code"):
                 cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
-        nbf.write(self.notebook, jupyter_notebook) 
+        DBI.save_notebook(
+            notebook_id = self.notebook.get('_id', None),
+            notebook_name = self.notebook.get('name', jupyter_notebook),
+            notebook_source = self.notebook['source'],
+            authors = self.notebook.get('authors', self.graph_state.get('user_id')),
+            notebook_description = self.notebook.get('description', None)
+        )
         
         return {
             "data_source": zarr_output,
@@ -470,5 +487,5 @@ class CDSForecastNotebookTool(BaseAgentTool):
                 "zarr_output": zarr_output,
                 "jupyter_notebook": jupyter_notebook,
             },
-            run_manager=run_manager
+            run_manager=run_manager,
         )

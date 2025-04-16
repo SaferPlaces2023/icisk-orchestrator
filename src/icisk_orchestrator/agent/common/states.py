@@ -9,4 +9,4 @@ from langgraph.graph.message import AnyMessage
 # DOC: This is a basic state that will be used by all nodes in the graph. It ha one key: "messages" : list[AnyMessage]
 class BaseGraphState(MessagesState):
     """Basic state"""
-    
+    user_id: str = None
