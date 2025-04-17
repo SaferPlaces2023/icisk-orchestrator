@@ -8,7 +8,7 @@ class BaseToolInterrupt(Exception):
     
     
     # DOC: BaseToolInterruptType is an enumeration that defines the types of interruptions that can occur during tool execution.
-    class BaseToolInterruptType(): #str, Enum):
+    class BaseToolInterruptType():
         PROVIDE_ARGS = "PROVIDE_ARGS"
         INVALID_ARGS = "INVALID_ARGS"
         CONFIRM_ARGS = "CONFIRM_ARGS"
