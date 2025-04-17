@@ -1,4 +1,1 @@
-from .state import (
-    WebAppState,
-    GUI
-)
+from .state import session_manager

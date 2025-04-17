@@ -4,7 +4,7 @@ import streamlit as st
 
 from db import DBI
 from webapp import langgraph_interface as lgi
-from webapp.session.state import WebAppState
+from webapp.session.state import session_manager
 
 
 
@@ -24,7 +24,7 @@ with center_col:
         if st.form_submit_button("Submit"):
             user = DBI.user_by_id(user_id)
             if user is not None or user_id.lower() == "admin":  # TODO: remove admin check
-                st.session_state.app = WebAppState(user_id=user_id)
+                session_manager.setup(user_id=user_id)
                 st.rerun()
                 
                 

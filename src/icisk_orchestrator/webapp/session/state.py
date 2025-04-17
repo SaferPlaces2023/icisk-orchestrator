@@ -32,14 +32,48 @@ class WebAppState():
     
     def __init__(self, user_id):
         self.user_id = user_id
-        self.thread_id = asyncio.run(lgi.create_thread(self.client, self.user_id))
+        self.thread_id = asyncio.run(lgi.create_thread(lgi.get_langgraph_client(), self.user_id))
         self.chat_history = []  # INFO: this is relative to Chat Messages (to be rendered in GUI)
         self.gui = GUI()  # INFO: this is relative to GUI Components properties
         self.graph_messages = []  # INFO: this is relative to Graph State Messages
+    
+    
+class SessionManager():
+    
+    def setup(self, user_id: str):
+        """
+        Setup the web app state.
+        
+        Parameters:
+            user_id (str): The user ID.
+        """
+        
+        st.session_state.app = WebAppState(user_id=user_id)
         
     @property
+    def user_id(self):
+        return st.session_state.app.user_id if hasattr(st.session_state, 'app') else None
+    
+    @property
+    def thread_id(self):
+        return st.session_state.app.thread_id if hasattr(st.session_state, 'app') else None
+    
+    @property
     def client(self):
-        return lgi.get_langgraph_client()
+        return lgi.get_langgraph_client() if hasattr(st.session_state, 'app') else None
+    
+    @property
+    def chat_history(self):
+        return st.session_state.app.chat_history if hasattr(st.session_state, 'app') else None
+    
+    @property
+    def gui(self):
+        return st.session_state.app.gui if hasattr(st.session_state, 'app') else None
+    
+    @property
+    def graph_messages(self):
+        return st.session_state.app.graph_messages if hasattr(st.session_state, 'app') else None
+    
     
     def is_interrupted(self):
         if len(self.graph_messages) > 0:
@@ -50,3 +84,7 @@ class WebAppState():
         if self.is_interrupted():
             return self.graph_messages[-1].get('response_key', 'response')
         return None
+    
+
+# DOC: Initialize the session manager
+session_manager = SessionManager()

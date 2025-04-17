@@ -12,6 +12,7 @@ import streamlit as st
 
 from webapp import utils
 from webapp import langgraph_interface as lgi
+from webapp.session.state import session_manager
 
 from db import DBI
 
@@ -41,7 +42,7 @@ with st.expander("# 💡 **What is this application?** "):
     
     
 
-for message in st.session_state.app.chat_history:
+for message in session_manager.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -55,7 +56,7 @@ def render_message(role, content):
         "tool": "🛠️"
     }
     st.chat_message(role, avatar=avatar[role]).markdown(content)
-    st.session_state.app.chat_history.append({"role": role, "content": content})
+    session_manager.chat_history.append({"role": role, "content": content})
 
 
 
@@ -92,7 +93,7 @@ def handle_response(response):
         
         if message is not None and message.get('type', None) != 'system':
             render_agent_response(message)
-            st.session_state.app.graph_messages.append(message)
+            session_manager.graph_messages.append(message)
     
             
 if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
@@ -100,11 +101,11 @@ if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
     
     async def run_chat():
         additional_args = {}
-        if st.session_state.app.is_interrupted():
-            additional_args['interrupt_response_key'] = st.session_state.app.get_interrupt_key()
+        if session_manager.is_interrupted():
+            additional_args['interrupt_response_key'] = session_manager.get_interrupt_key()
         async for message in lgi.ask_agent(
-            st.session_state.app.client, 
-            st.session_state.app.thread_id, 
+            session_manager.client, 
+            session_manager.thread_id, 
             prompt,
             **additional_args
         ):
@@ -116,7 +117,7 @@ if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
 with st.sidebar:
     
     with st.expander("**📁 File manager**"):
-        avaliable_files = st.session_state.app.gui.filenames
+        avaliable_files = session_manager.gui.filenames
         
         if len(avaliable_files) == 0:
             st.markdown("No files uploaded yet.")
@@ -142,20 +143,20 @@ with st.sidebar:
                             if st.button("Close"):
                                 st.rerun()  
                         show_ipynb_code.title = filename
-                        show_ipynb_code(DBI.notebook_by_name(filename, retrieve_source=True)['source'])
+                        show_ipynb_code(DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True)['source'])
                         
                 with col_download:
-                    if st.session_state.app.gui.is_requested_download(filename):
+                    if session_manager.gui.is_requested_download(filename):
                         st.download_button(
                             label = "📥",
-                            data = DBI.notebook_by_name(filename, retrieve_source=True)['source'],
+                            data = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True)['source'],
                             file_name = filename,
                             mime = "json/ipynb",
                             key = f"download_{filename}-{ifn}"
                         )
                     else:
                         if st.button("📁", key=f"pre-download_{filename}-{ifn}", help="request download"):
-                            st.session_state.app.gui.request_download(filename)
+                            session_manager.gui.request_download(filename)
                             st.rerun()
                         
         st.divider()
@@ -172,7 +173,7 @@ with st.sidebar:
                         notebook_id = None,
                         notebook_name = file_uploader.name,
                         notebook_source = nbf.reads(StringIO(file_uploader.getvalue().decode("utf-8")).read(), as_version=4),
-                        authors = st.session_state.app.user_id,
+                        authors = session_manager.user_id,
                         notebook_description = None
                     )
                 st.rerun()

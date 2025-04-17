@@ -76,8 +76,7 @@ class DatabaseInterface():
             )
             
             
-    # FIXME: Need to search also by author not in all notebooks!            
-    def notebook_by_name(self, notebook_name: str, retrieve_source: bool = False):
+    def notebook_by_name(self, author: str, notebook_name: str, retrieve_source: bool = False):
         """
         Retrieve a notebook by its name.
         
@@ -95,9 +94,9 @@ class DatabaseInterface():
         
         # DOC: Retrieve the notebook by its name
         if retrieve_source:
-            return notebooks_collection.find_one({ 'name': notebook_name })
+            return notebooks_collection.find_one({ 'authors': author, 'name': notebook_name })
         else:
-            return notebooks_collection.find_one({ 'name': notebook_name }, { 'source': 0 })
+            return notebooks_collection.find_one({ 'authors': author, 'name': notebook_name }, { 'source': 0 })
         
         
     def notebooks_by_author(self, author: str, retrieve_source: bool = False):
@@ -121,6 +120,7 @@ class DatabaseInterface():
             return list(notebooks_collection.find({ 'authors': author }))
         else:
             return list(notebooks_collection.find({ 'authors': author }, { 'source': 0 }))
+        
         
     def user_by_id(self, user_id: str):
         """
