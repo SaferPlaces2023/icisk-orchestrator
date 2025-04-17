@@ -8,16 +8,16 @@ def get_langgraph_client():
     return client
 
     
-async def create_thread(client, username):
+async def create_thread(client, user_id):
     thread = await client.threads.create()
     thread_id = thread['thread_id']
     _ = await client.runs.create(
         thread_id,
         "agent",
         stream_mode = "updates",
-        input = { 'user_id': username }
+        input = { 'user_id': user_id }
     )
-    print(f"Thread {thread_id} assigned to user {username}")
+    print(f"Thread {thread_id} assigned to user {user_id}")
     return thread['thread_id']
 
 

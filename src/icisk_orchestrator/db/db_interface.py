@@ -76,6 +76,7 @@ class DatabaseInterface():
             )
             
             
+    # FIXME: Need to search also by author not in all notebooks!            
     def notebook_by_name(self, notebook_name: str, retrieve_source: bool = False):
         """
         Retrieve a notebook by its name.
@@ -121,7 +122,25 @@ class DatabaseInterface():
         else:
             return list(notebooks_collection.find({ 'authors': author }, { 'source': 0 }))
         
+    def user_by_id(self, user_id: str):
+        """
+        Retrieve a user by its ID.
         
+        Parameters:
+            user_id (str): The ID of the user.
+        
+        Returns:
+            dict: User document.
+        """
+        
+        self.connect()
+        
+        users_collection = self.db['users']
+        
+        # DOC: Retrieve the user by its ID
+        return users_collection.find_one({ 'user_id': user_id })
+    
+    
 
 # DOC: Singleton instance of the DatabaseInterface class
 DBI = DatabaseInterface()
