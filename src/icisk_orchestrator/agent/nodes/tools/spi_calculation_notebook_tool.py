@@ -161,9 +161,6 @@ class SPICalculationNotebookTool(BaseAgentTool):
         existing_jupyter_notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=True)
         if existing_jupyter_notebook is not None:
             self.notebook = existing_jupyter_notebook
-        
-        # if os.path.exists(jupyter_notebook):
-        #     self.notebook = nbf.read(jupyter_notebook, as_version=4)
             
         self.notebook.cells.extend([
             nbf.v4.new_code_cell("""

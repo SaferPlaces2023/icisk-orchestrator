@@ -263,8 +263,6 @@ class CDSForecastNotebookTool(BaseAgentTool):
         if existing_jupyter_notebook is not None:
             self.notebook = existing_jupyter_notebook
             self.notebook['source'] = nbf.reads(existing_jupyter_notebook['source'], as_version=4)
-        # if os.path.exists(jupyter_notebook):
-        #     self.notebook = nbf.read(jupyter_notebook, as_version=4)
         
         self.notebook['source'].cells.extend([
             nbf.v4.new_code_cell("""
