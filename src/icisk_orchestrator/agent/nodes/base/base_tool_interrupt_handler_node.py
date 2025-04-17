@@ -177,6 +177,7 @@ class BaseToolInterruptArgsConfirmationHandler(BaseToolInterruptHandler):
         super().handle(tool, interupt_data)
         
         interrupt_message = self._generate_interrupt_message()
+        
         interruption = interrupt({
             "content": interrupt_message,
             "interrupt_type": BaseToolInterrupt.BaseToolInterruptType.CONFIRM_ARGS
@@ -268,7 +269,7 @@ class BaseToolInterruptOutputConfirmationHandler(BaseToolInterruptHandler):
         interrupt_message = self._generate_interrupt_message()
         interruption = interrupt({
             "content": interrupt_message,
-            "interrupt_type": BaseToolInterrupt.BaseToolInterruptType.CONFIRM_OUTPUT,
+            "interrupt_type": BaseToolInterrupt.BaseToolInterruptType.CONFIRM_OUTPUT
         })
         response = interruption.get('response', 'User did not provide any response.')
         provided_output = self._classify_output_confirmation(response)
@@ -340,7 +341,7 @@ class BaseToolInterruptNode:
         self.tool_handler_node_name = tool_handler_node_name
         self.tool_interrupt_node_name = tool_interrupt_node_name
         self.tools = tools
-        self.tool_interupt_handlers.update(custom_tool_interupt_handlers) # DOC: Dict Key is BaseToolInterruptType and Value is the handler class
+        self.tool_interupt_handlers.update(custom_tool_interupt_handlers)   # DOC: Dict Key is BaseToolInterruptType and Value is the handler class
         
     def setup(self):
         

@@ -84,7 +84,7 @@ class CodeEditorTool(BaseAgentTool):
         def add_source_code(source_code):
             nb = nbf.reads(self.notebook['source'], as_version=4)
             nb.cells.append(new_code_cell(source = source_code))
-            self.notebook['source'] = nbf.writes(nb, version=4)
+            self.notebook['source'] = nb
             DBI.save_notebook(
                 notebook_id = self.notebook.get('_id', None),
                 notebook_name = self.notebook.get('name', source),

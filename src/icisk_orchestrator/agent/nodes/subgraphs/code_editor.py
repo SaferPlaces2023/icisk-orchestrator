@@ -48,7 +48,7 @@ code_editor_tool_handler = BaseToolHandlerNode(
 # DOC: Override this method to handle CodeEditor output updating
 class CodeEditorToolInterruptOutputConfirmationHandler(BaseToolInterruptOutputConfirmationHandler):
     
-    def _generate_provided_output(self, response):
+    def _generate_provided_output(self, response):        
         args_value = '\n'.join([ f'- {arg}: {val}' for arg,val in self.tool_interrupt["data"]["args"].items() ])
         update_inputs = utils.ask_llm(
             role = 'system',
@@ -67,7 +67,8 @@ class CodeEditorToolInterruptOutputConfirmationHandler(BaseToolInterruptOutputCo
             eval_output = True
         )
         return update_inputs
-        
+    
+      
 # DOC: Base tool interrupt node: handle tool interrupt by type and go back to tool hndler with updatet state to rerun tool
 code_editor_tool_interrupt = BaseToolInterruptNode(
     state = CodeEditorState,

@@ -60,7 +60,7 @@ class BaseToolHandlerNode:
             try:
                 tool = self.tools[tool_call['name']]
                 tool.graph_state = state
-                result = self.tools[tool_call['name']].invoke(tool_call['args'])
+                result = tool.invoke(tool_call['args'])
             except BaseToolInterrupt as tool_interrupt:                
                 update_state = {}
                 update_state['nodes_params'] = { 
