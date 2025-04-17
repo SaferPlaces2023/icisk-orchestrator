@@ -82,6 +82,9 @@ class CodeEditorTool(BaseAgentTool):
             return source_code
         
         def add_source_code(source_code):
+            if source_code.startswith('```python'):
+                source_code = source_code.split('```python')[1].split('```')[0]
+            
             nb = nbf.reads(self.notebook['source'], as_version=4)
             nb.cells.append(new_code_cell(source = source_code))
             self.notebook['source'] = nb
