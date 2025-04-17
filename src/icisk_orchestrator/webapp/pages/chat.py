@@ -169,6 +169,6 @@ with st.sidebar:
                     )
                 st.rerun()
         
-    # TODO: Second sidebar element (Will be used for displaying graph state)
+    # INFO: Second sidebar element (Will be used for displaying graph state)
     with st.expander("📊 Graph state"):
         st.markdown("Graph state will be displayed here")
