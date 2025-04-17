@@ -9,6 +9,7 @@ import nbformat as nbf
 import nest_asyncio; nest_asyncio.apply()
 import asyncio
 import streamlit as st
+from st_copy_to_clipboard import st_copy_to_clipboard
 
 from webapp import utils
 from webapp import langgraph_interface as lgi
@@ -20,7 +21,6 @@ from db import DBI
 
 st.set_page_config(page_title="ICisk AI Agent", page_icon="🧠", layout="wide")
 st.title("🧠 ICisk AI Agent")
-
 
 
 with st.expander("# 💡 **What is this application?** "):

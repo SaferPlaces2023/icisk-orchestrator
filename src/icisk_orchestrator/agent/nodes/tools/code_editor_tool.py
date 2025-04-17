@@ -1,5 +1,8 @@
 import os
 
+import nbformat as nbf
+from nbformat.v4 import new_code_cell
+
 from typing import Optional
 from pydantic import BaseModel, Field
 from langchain_core.callbacks import (
@@ -11,8 +14,7 @@ from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
 
-import nbformat as nbf
-from nbformat.v4 import new_code_cell
+from db import DBI
 
 
 
@@ -41,7 +43,11 @@ class CodeEditorTool(BaseAgentTool):
             ]
         )
         
+    # DOC: Additional tool args
+    notebook: dict = dict()
     
+    
+    # DOC: Initialize the tool with a name, description and args_schema
     def __init__(self, **kwargs):
         super().__init__(
             name = N.CODE_EDITOR_TOOL,
@@ -51,18 +57,14 @@ class CodeEditorTool(BaseAgentTool):
             **kwargs
         )
         
-        self.execution_confirmed = True     # INFO: Skip this, there will be output_confirmed:True
+        self.execution_confirmed = True     # DOC: Skip this, there will be output_confirmed:True
         
-    
-    # def get_source_path(self, source):
-    #     source_path = os.path.join('src', 'icisk_orchestrator', 'session', 'files', source)
-    #     return source_path
     
     def _set_args_validation_rules(self):
         return {
             'source': [
-                lambda **ka: f"Invalid source: {ka['source']}. It should be a valid path to a python script or jupyter notebook."
-                    if not os.path.exists(ka['source']) else None
+                lambda **ka: f"Invalid source: {ka['source']}. It should be the name of a notebook uploaded on databse."
+                    if DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=ka['source']) is None else None
             ]
         }
         
@@ -73,31 +75,23 @@ class CodeEditorTool(BaseAgentTool):
         code_request: None | str | list[str],
     ):
         
-        # source_path = self.get_source_path(source)
+        self.notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=source, retrieve_source=True)
         
         def get_source_code():
-            if source.endswith('.ipynb'):
-                nb = nbf.read(source, as_version=4)
-                source_code = [cell.source for cell in nb.cells if cell.cell_type == 'code' and cell.source != '']
-                source_code = '\n'.join(source_code)
-            elif source.endswith('.py'):
-                with open(source, 'r') as f:
-                    source_code = f.read().split('\n')
+            source_code = [cell.source for cell in nbf.reads(self.notebook['source'], as_version=4).cells if cell.cell_type == 'code' and cell.source != '']
             return source_code
         
         def add_source_code(source_code):
-            if source.endswith('.ipynb'):
-                nb = nbf.read(source, as_version=4)
-                new_cell = new_code_cell(source = source_code)
-                nb.cells.append(new_cell)
-                nbf.write(nb, source)
-            elif source.endswith('.py'):
-                with open(source, 'a') as f:
-                    f.write('\n')
-                    f.write('# Code from ICisk AI Agent ----------------------------------------------------\n')
-                    f.write(source_code)
-                    f.write('\n')
-                    f.write('-------------------------------------------------------------------------------\n')
+            nb = nbf.reads(self.notebook['source'], as_version=4)
+            nb.cells.append(new_code_cell(source = source_code))
+            self.notebook['source'] = nbf.writes(nb, version=4)
+            DBI.save_notebook(
+                notebook_id = self.notebook.get('_id', None),
+                notebook_name = self.notebook.get('name', source),
+                notebook_source = self.notebook['source'],
+                authors = self.notebook.get('authors', self.graph_state.get('user_id')),
+                notebook_description = self.notebook.get('description', None)
+            )
                     
         if not self.output_confirmed:
             
@@ -129,6 +123,7 @@ class CodeEditorTool(BaseAgentTool):
             add_source_code(generated_code)
                         
         return {
+            "notebook": source,
             "generated_code" : generated_code
         }
         

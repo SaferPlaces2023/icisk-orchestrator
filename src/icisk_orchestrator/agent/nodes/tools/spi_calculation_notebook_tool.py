@@ -4,6 +4,8 @@ import dateutil.relativedelta
 
 from enum import Enum
 
+import nbformat as nbf
+
 from typing import Optional
 from pydantic import BaseModel, Field
 from langchain_core.callbacks import (
@@ -15,7 +17,8 @@ from agent import utils
 from agent.common import names as N
 from agent.nodes.base import BaseAgentTool
 
-import nbformat as nbf
+from db import DBI
+
 
 
 # DOC: This is a tool that exploits I-Cisk API to calculate SPI (Standard Precipitation Index) for a given location in a give time period.
@@ -155,8 +158,12 @@ class SPICalculationNotebookTool(BaseAgentTool):
     
      # DOC: Preapre notebook cell code template
     def prepare_notebook(self, jupyter_notebook):
-        if os.path.exists(jupyter_notebook):
-            self.notebook = nbf.read(jupyter_notebook, as_version=4)
+        existing_jupyter_notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=True)
+        if existing_jupyter_notebook is not None:
+            self.notebook = existing_jupyter_notebook
+        
+        # if os.path.exists(jupyter_notebook):
+        #     self.notebook = nbf.read(jupyter_notebook, as_version=4)
             
         self.notebook.cells.extend([
             nbf.v4.new_code_cell("""
@@ -424,7 +431,13 @@ class SPICalculationNotebookTool(BaseAgentTool):
             if cell.cell_type in ("markdown", "code"):
                 cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
         
-        nbf.write(self.notebook, jupyter_notebook) 
+        DBI.save_notebook(
+            notebook_id = self.notebook.get('_id', None),
+            notebook_name = self.notebook.get('name', jupyter_notebook),
+            notebook_source = self.notebook['source'],
+            authors = self.notebook.get('authors', self.graph_state.get('user_id')),
+            notebook_description = self.notebook.get('description', None)
+        )
         
         return {
             "notebook": jupyter_notebook

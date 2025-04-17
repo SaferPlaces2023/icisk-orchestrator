@@ -3,10 +3,9 @@ import datetime
 from dateutil import relativedelta
 from enum import Enum
 
+import nbformat as nbf
+
 from typing import Optional
-from typing_extensions import Annotated
-from langgraph.prebuilt import InjectedState
-from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
@@ -19,7 +18,6 @@ from agent.nodes.base import BaseAgentTool
 
 from db import DBI
 
-import nbformat as nbf
 
 
 # DOC: This is a tool that exploits I-Cisk API to ingests forecast data from the Climate Data Store (CDS) API and saves it in a zarr format. It build a jupyter notebook to do that.
@@ -48,6 +46,10 @@ class CDSForecastNotebookTool(BaseAgentTool):
                 'total_precipitation': 'tp',
                 'temperature': 't2m',
             }.get(self.value)
+            
+        @property
+        def as_str(self) -> str:
+            return self.value
             
         @classmethod
         def from_str(cls, alias, raise_error=False):
@@ -242,7 +244,7 @@ class CDSForecastNotebookTool(BaseAgentTool):
         
         def infer_jupyter_notebook(**ka):
             if ka['jupyter_notebook'] is None:
-                return f"icisk-ai_cds-forecast_{ka['forecast_variables'][0]}_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
+                return f"icisk-ai_cds-forecast_{ka['forecast_variables'][0].as_str}_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
             return ka['jupyter_notebook']
         
         return {
