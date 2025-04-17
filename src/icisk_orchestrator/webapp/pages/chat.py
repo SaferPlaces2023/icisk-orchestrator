@@ -94,6 +94,7 @@ def handle_response(response):
         if message is not None and message.get('type', None) != 'system':
             render_agent_response(message)
             session_manager.graph_messages.append(message)
+            
     
             
 if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
@@ -132,18 +133,10 @@ with st.sidebar:
                     
                 with col_view:
                     if st.button("👁️", key=f"view_{filename}-{ifn}", help="view file"):
-                        @st.dialog(filename, width="large")
-                        def show_ipynb_code(source_code: str):
-                            notebook = nbf.reads(source_code, as_version=4)
-                            for cell in notebook.cells:
-                                if cell.cell_type == 'code':
-                                    st.code(cell.source, language='python')
-                                elif cell.cell_type == 'markdown':
-                                    st.markdown(cell.source)
-                            if st.button("Close"):
-                                st.rerun()  
-                        show_ipynb_code.title = filename
-                        show_ipynb_code(DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True)['source'])
+                        utils.dialog_notebook_code(
+                            dialog_title = filename,
+                            notebook_code = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True)['source']
+                        )
                         
                 with col_download:
                     if session_manager.gui.is_requested_download(filename):
