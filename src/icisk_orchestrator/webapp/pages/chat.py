@@ -16,8 +16,6 @@ from webapp.session.state import session_manager
 
 from db import DBI
 
-from agent.common import names as AGENT_N
-
 
 
 st.set_page_config(page_title="ICisk AI Agent", page_icon="🧠", layout="wide")
@@ -171,6 +169,6 @@ with st.sidebar:
                     )
                 st.rerun()
         
-    # INFO: Second sidebar element (Will be used for displaying graph state)
+    # TODO: Second sidebar element (Will be used for displaying graph state)
     with st.expander("📊 Graph state"):
         st.markdown("Graph state will be displayed here")
