@@ -19,7 +19,7 @@ from agent.common import names as AGENT_N
 
 
 
-st.set_page_config(page_title="ICisk AI Agent", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="ICisk AI Agent", page_icon="🧠", layout="wide")
 st.title("🧠 ICisk AI Agent")
 
 

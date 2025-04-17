@@ -35,13 +35,12 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["langgraph.templates.agent", "db", "agent", "webapp", "session"]
+packages = ["langgraph.templates.agent", "db", "agent", "webapp"]
 [tool.setuptools.package-dir]
 "langgraph.templates.agent" = "src/icisk_orchestrator/agent"
 "db" = "src/icisk_orchestrator/db"
 "agent" = "src/icisk_orchestrator/agent"
 "webapp" = "src/icisk_orchestrator/webapp"
-"session" = "src/icisk_orchestrator/session"
 
 
 [tool.setuptools.package-data]
