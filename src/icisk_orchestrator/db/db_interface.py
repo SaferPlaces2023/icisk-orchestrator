@@ -54,8 +54,8 @@ class DatabaseInterface():
         # DOC: All notebooks will be visible to admin
         if isinstance(authors, str):
             authors = [ authors ]
-        if 'ADMIN' not in authors:
-            authors.append('ADMIN')
+        if 'admin' not in authors:
+            authors.append('admin')
         
         # DOC: Create the notebook document to be inserted or updated in the collection
         notebook_document = {

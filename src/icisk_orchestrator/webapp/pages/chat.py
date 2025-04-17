@@ -115,6 +115,7 @@ if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
 
 with st.sidebar:
     
+    # DOC: Sidebar element used as file-manager (view, upload, download)
     with st.expander("**📁 File manager**"):
         avaliable_files = session_manager.gui.filenames
         
@@ -168,7 +169,13 @@ with st.sidebar:
                         notebook_description = None
                     )
                 st.rerun()
+
+
+    # TODO: Sidebar element (Will be used for previous chat)
+    with st.expander("📜 **Previous chats** — _[ future dev ]_"):
+        st.markdown("Previous chats will be displayed here.")
         
-    # INFO: Second sidebar element (Will be used for displaying graph state)
-    with st.expander("📊 Graph state"):
-        st.markdown("Graph state will be displayed here")
+
+    # TODO: Sidebar element (Will be used for displaying graph state)
+    with st.expander("🔗 **Graph state** — _[ future dev ]_"):
+        st.markdown("Graph state will be displayed here.")
