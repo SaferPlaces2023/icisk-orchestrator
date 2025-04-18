@@ -13,7 +13,7 @@ from st_copy_to_clipboard import st_copy_to_clipboard
 
 from webapp import utils
 from webapp import langgraph_interface as lgi
-from webapp.session.state import session_manager, Interrupt, BaseToolInterrupt
+from webapp.session.state import session_manager, Interrupt
 
 from db import DBI
 
@@ -102,7 +102,7 @@ if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
     def optional_resume_interrupt():
         out = dict()
         if session_manager.is_interrupted():
-            out['interrupt_response_key'] = session_manager.get_interrupt_key()
+            out['interrupt_response_key'] = session_manager.interrupt.resume_key
             session_manager.interrupt = None
         return out
             

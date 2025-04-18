@@ -103,14 +103,11 @@ class SessionManager():
     
     def is_interrupted(self):
         return self.interrupt is not None
-        # if len(self.graph_messages) > 0:
-        #     return self.graph_messages[-1].get("is_interrupt", False)
-        # return False
     
-    def get_interrupt_key(self):
-        if self.is_interrupted():
-            return self.graph_messages[-1].get('response_key', 'response')
-        return None
+    # def get_interrupt_key(self):
+    #     if self.is_interrupted():
+    #         return self.graph_messages[-1].get('response_key', 'response')
+    #     return None
     
 
 # DOC: Initialize the session manager
