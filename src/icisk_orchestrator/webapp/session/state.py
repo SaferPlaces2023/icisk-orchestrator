@@ -83,6 +83,7 @@ class SessionManager():
     
     @property
     def graph_messages(self):
+        # TODO: Update chat to db
         return st.session_state.app.graph_messages if hasattr(st.session_state, 'app') else None
     
     @property

@@ -92,7 +92,8 @@ def handle_response(response):
         
         if message is not None and message.get('type', None) != 'system':
             render_agent_response(message)
-            session_manager.graph_messages.append(message)
+        
+        session_manager.graph_messages.append(message)
             
     
             
