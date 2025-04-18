@@ -15,8 +15,8 @@ from langchain_core.callbacks import (
 from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
-
-from db import DBI
+from agent.common.notebook_templates.nbt_cds_fc_era5_seasonal import notebook_template as nbt_cds_fc_era5_seasonal
+from db import DBI, DBS
 
 
 
@@ -146,9 +146,7 @@ class CDSForecastNotebookTool(BaseAgentTool):
         )
         
     # DOC: Additional tool args
-    notebook: dict = {
-        'source': nbf.v4.new_notebook()
-    }
+    notebook: DBS.Notebook = None
 
     
     # DOC: Initialize the tool with a name, description and args_schema
@@ -259,173 +257,14 @@ class CDSForecastNotebookTool(BaseAgentTool):
     
     # DOC: Preapre notebook cell code template
     def prepare_notebook(self, jupyter_notebook):
-        existing_jupyter_notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=True)
-        if existing_jupyter_notebook is not None:
-            self.notebook = existing_jupyter_notebook
-            self.notebook['source'] = nbf.reads(existing_jupyter_notebook['source'], as_version=4)
-        
-        self.notebook['source'].cells.extend([
-            nbf.v4.new_code_cell("""
-                # Section "Dependencies"
-
-                %%capture
-
-                import os
-                import json
-                import datetime
-                import requests
-                import getpass
-                import pprint
-
-                import numpy as np
-                import pandas as pd
-
-                !pip install zarr xarray
-                import xarray as xr
-
-                !pip install s3fs
-                import s3fs
-
-                !pip install "cdsapi>=0.7.4"
-                import cdsapi
-                
-                !pip install cartopy
-                import cartopy.crs as ccrs
-                import cartopy.feature as cfeature
-            """),
-            nbf.v4.new_code_cell("""
-                # Section "Define constant"
-
-                # Forcast variables
-                forecast_variables = {forecast_variables}
-                
-                # Bouning box of interest in format [min_lon, min_lat, max_lon, max_lat]
-                region = {area}
-
-                # init forecast datetime
-                init_time = datetime.datetime.strptime('{init_time}', "%Y-%m-%d").replace(day=1)
-
-                # lead forecast datetime
-                lead_time = datetime.datetime.strptime('{lead_time}', "%Y-%m-%d").replace(day=1)
-
-                # ingested data ouput zarr file
-                zarr_output = '{zarr_output}'
-            """, metadata={"need_format": True}),
-            nbf.v4.new_code_cell("""
-                # Section "Call I-Cisk cds-ingestor-process API"
-
-                # Prepare payload
-                icisk_api_payload = {{
-                    "inputs": {{
-                        "dataset": "seasonal-original-single-levels",
-                        "file_out": f"/tmp/{{zarr_output.replace('.zarr', '')}}.nc",
-                        "query": {{
-                            "originating_centre": "ecmwf",
-                            "system": "51",
-                            "variable": forecast_variables,
-                            "year": [f"{{init_time.year}}"],
-                            "month": [f"{{init_time.month:02d}}"],
-                            "day": ["01"],
-                            "leadtime_hour": [str(h) for h in range(24, int((lead_time - init_time).total_seconds() // 3600), 24)],
-                            "area": [
-                                region[3],
-                                region[0],
-                                region[1],
-                                region[2]
-                            ],
-                            "data_format": "netcdf",
-                        }},
-                        "token": "YOUR-ICISK-API-TOKEN",
-                        "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{{zarr_output}}",
-                    }}
-                }}
-
-                print(); print('-------------------------------------------------------------------'); print();
-
-                pprint.pprint(icisk_api_payload)
-
-                print(); print('-------------------------------------------------------------------'); print();
-
-                icisk_api_token = 'token' # getpass.getpass("YOUR ICISK-API-TOKEN: ")
-
-                icisk_api_payload['inputs']['token'] = icisk_api_token
-
-                # Call API
-                root_url = 'NGROK-URL' # 'https://i-cisk.dev.52north.org/ingest'
-                icisk_api_response = requests.post(
-                    url = f'{{root_url}}/processes/ingestor-cds-process/execution',
-                    json = icisk_api_payload
-                )
-
-                # Display response
-                pprint.pprint({{
-                    'response': icisk_api_response.json(),
-                    'status_code': icisk_api_response.status_code,
-                }})
-            """),
-            nbf.v4.new_code_cell("""
-                # Section "Get data from I-Cisk collection"
-
-                living_lab = None
-                collection_name = f"seasonal-original-single-levels_{{init_time.strftime('%Y%m')}}_{{living_lab}}_{icisk_varname}_0"
-
-                # Query collection
-                collection_response = requests.get(
-                    f'{{root_url}}/collections/{{collection_name}}/cube',
-                    params = {{
-                        'bbox': ','.join(map(str, region)),
-                        'f': 'json'
-                    }}
-                )
-
-                # Get response
-                if collection_response.status_code == 200:
-                    collection_data = collection_response.json()
-                else:
-                    print(f'Error {{collection_response.status_code}}: {{collection_response.json()}}')
-            """),
-            nbf.v4.new_code_cell("""
-                # Section "Build dataset"
-
-                # Parse collection output data
-                axes = collection_data['domain']['axes']
-                dims = {{
-                    'model': list(map(int, [p.split('_')[1] for p in params])),
-                    'time': pd.date_range(axes['time']['start'], axes['time']['stop'], axes['time']['num']),
-                    'lon': np.linspace(axes['x']['start'], axes['x']['stop'], axes['x']['num'], endpoint=True),
-                    'lat': np.linspace(axes['y']['start'], axes['y']['stop'], axes['y']['num'], endpoint=True)
-                }}
-
-                params = collection_data['parameters']
-                ranges = collection_data['ranges']
-                vars = {{
-                    '{icisk_varname}': (tuple(dims.keys()), np.stack([ np.array(ranges[name]['values']).reshape((len(dims['time']), len(dims['lon']), len(dims['lat']))) for name in params ]) )
-                }}
-
-                # Build xarray dataset
-                dataset = xr.Dataset(
-                    data_vars = vars,
-                    coords = dims
-                )
-            """),
-            nbf.v4.new_code_cell("""
-                # Section "Describe dataset"
-
-                \"\"\"
-                Object "dataset" is a xarray.Dataset
-                It has  three dimensions named:
-                - 'model': list of model ids 
-                - 'lat': list of latitudes, 
-                - 'lon': list of longitudes,
-                - 'time': forecast timesteps
-                It has 1 variables named {icisk_varname} representing the {cds_varname} forecast data. It has a shape of [model, time, lat, lon].
-                \"\"\"
-
-                # Use this dataset variable to do next analysis or plots
-
-                display(dataset)
-            """)
-        ])
+        self.notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=False)
+        if self.notebook is None:
+            self.notebook = DBS.Notebook(
+                name = jupyter_notebook,
+                authors = self.graph_state.get('user_id'),
+                source = nbf.v4.new_notebook()
+            )
+        self.notebook.source.cells.extend(nbt_cds_fc_era5_seasonal.cells)
     
     
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file
@@ -449,16 +288,10 @@ class CDSForecastNotebookTool(BaseAgentTool):
             'cds_varname': self.InputForecastVariable(forecast_variables[0]).as_cds,
             'icisk_varname': self.InputForecastVariable(forecast_variables[0]).as_icisk,
         }
-        for cell in self.notebook['source'].cells:
+        for cell in self.notebook.source.cells:
             if cell.cell_type in ("markdown", "code"):
                 cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
-        DBI.save_notebook(
-            notebook_id = self.notebook.get('_id', None),
-            notebook_name = self.notebook.get('name', jupyter_notebook),
-            notebook_source = self.notebook['source'],
-            authors = self.notebook.get('authors', self.graph_state.get('user_id')),
-            notebook_description = self.notebook.get('description', None)
-        )
+        DBI.save_notebook(**self.notebook.as_dict)
         
         return {
             "data_source": zarr_output,

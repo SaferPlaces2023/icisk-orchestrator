@@ -1,9 +1,12 @@
 # Deps
+from functools import singledispatchmethod
 
 from pymongo import MongoClient
 from bson import ObjectId
 
 import nbformat as nbf
+
+from db import DBS, db_utils
 
 # DB general
 
@@ -29,9 +32,16 @@ class DatabaseInterface():
         if self.client is not None:
             self.client.close()
             self.client = None
-        
-        
-    def save_notebook(self, notebook_id: str, notebook_name: str, notebook_source: str | nbf.NotebookNode, authors: str | list[str], notebook_description: str = None):
+            
+    
+    def save_notebook(
+        self, 
+        _id: str | ObjectId,
+        name: str,
+        source: str | nbf.NotebookNode,
+        authors: str | list[str],
+        description: str = None
+    ):
         """
         Save a notebook to the database.
         
@@ -44,12 +54,11 @@ class DatabaseInterface():
         
         self.connect()
         
-        notebooks_collection = self.db['notebooks']     # TODO: Move names to db-schema-class
+        notebooks_collection = self.db[DBS.Collections.NOTEBOOKS]     # TODO: Move names to db-schema-class
         
-        # DOC: Get notebook source if filename is provided
-        if isinstance(notebook_source, str):
-            with open(notebook_source, 'r') as f:
-                notebook_source = nbf.read(f, as_version=4)
+        # DOC: If source is a string, it is converted to a NotebookNode object
+        if isinstance(source, str):
+            source = nbf.reads(source, as_version=4)
         
         # DOC: All notebooks will be visible to admin
         if isinstance(authors, str):
@@ -59,19 +68,19 @@ class DatabaseInterface():
         
         # DOC: Create the notebook document to be inserted or updated in the collection
         notebook_document = {
-            'name': notebook_name,
-            'source': nbf.writes(notebook_source),
+            'name': name,
+            'source': nbf.writes(source),
             'authors': authors,
-            'description': notebook_description,
+            'description': description,
         }
         
         # DOC: If notebook_id is None, we are creating a new notebook, otherwise we are updating an existing one
-        if notebook_id is None:
+        if _id is None:
             insert_result = notebooks_collection.insert_one(notebook_document)
             print(f'Inserted notebook result: {insert_result}')
         else:
             notebooks_collection.update_one(
-                { '_id': ObjectId(notebook_id) },
+                { '_id': ObjectId(_id) if isinstance(_id, str) else _id },
                 { '$set': notebook_document }
             )
             
@@ -90,13 +99,16 @@ class DatabaseInterface():
         
         self.connect()
         
-        notebooks_collection = self.db['notebooks']
+        notebooks_collection = self.db[DBS.Collections.NOTEBOOKS]
         
         # DOC: Retrieve the notebook by its name
         if retrieve_source:
-            return notebooks_collection.find_one({ 'authors': author, 'name': notebook_name })
+            notebook = notebooks_collection.find_one({ 'authors': author, 'name': notebook_name })
         else:
-            return notebooks_collection.find_one({ 'authors': author, 'name': notebook_name }, { 'source': 0 })
+            notebook = notebooks_collection.find_one({ 'authors': author, 'name': notebook_name }, { 'source': 0 })
+        
+        notebook = db_utils.cast_to_schema(DBS.Notebook, notebook)
+        return notebook
         
         
     def notebooks_by_author(self, author: str, retrieve_source: bool = False):
@@ -117,9 +129,12 @@ class DatabaseInterface():
         
         # DOC: Retrieve all notebooks by the author
         if retrieve_source:
-            return list(notebooks_collection.find({ 'authors': author }))
+            notebooks = list(notebooks_collection.find({ 'authors': author }))
         else:
-            return list(notebooks_collection.find({ 'authors': author }, { 'source': 0 }))
+            notebooks = list(notebooks_collection.find({ 'authors': author }, { 'source': 0 }))
+        
+        notebooks = db_utils.cast_to_schema(DBS.Notebook, notebooks)
+        return notebooks
         
         
     def user_by_id(self, user_id: str):
@@ -135,10 +150,14 @@ class DatabaseInterface():
         
         self.connect()
         
-        users_collection = self.db['users']
+        users_collection = self.db[DBS.Collections.USERS]
         
         # DOC: Retrieve the user by its ID
-        return users_collection.find_one({ 'user_id': user_id })
+        user = users_collection.find_one({ 'user_id': user_id })
+        
+        user = db_utils.cast_to_schema(DBS.User, user)
+        
+        return user
     
     
 

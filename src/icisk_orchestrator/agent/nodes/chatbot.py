@@ -48,12 +48,12 @@ def chatbot(state: BaseGraphState) -> Command[Literal[END, N.CDS_FORECAST_SUBGRA
             ai_message.tool_calls = [tool_call] 
             
             if tool_call['name'] == cds_forecast_notebook_tool.name:
-                return Command(goto = N.CDS_FORECAST_SUBGRAPH, update = { "messages": [ ai_message ] })
+                return Command(goto = N.CDS_FORECAST_SUBGRAPH, update = { "messages": [ ai_message ], "node_history": [N.CHATBOT, N.CDS_FORECAST_SUBGRAPH] })
             elif tool_call['name'] == spi_calculation_notebook_tool.name:
-                return Command(goto = N.SPI_CALCULATION_SUBGRAPH, update = { "messages": [ ai_message ] })
+                return Command(goto = N.SPI_CALCULATION_SUBGRAPH, update = { "messages": [ ai_message ], "node_history": [N.CHATBOT, N.SPI_CALCULATION_SUBGRAPH] })
             elif tool_call['name'] == base_code_editor_tool.name:
-                return Command(goto = N.CODE_EDITOR_SUBGRAPH, update = { "messages": [ ai_message ] })
+                return Command(goto = N.CODE_EDITOR_SUBGRAPH, update = { "messages": [ ai_message ], "node_history": [N.CHATBOT, N.CODE_EDITOR_SUBGRAPH] })
 
-        return Command(goto = END, update = { "messages": [ ai_message ], "requested_agent": None, "nodes_params": dict() })
+        return Command(goto = END, update = { "messages": [ ai_message ], "requested_agent": None, "nodes_params": dict(), "node_history": [N.CHATBOT] })
     
-    return Command(goto = END, update = { "messages": [], "requested_agent": None, "nodes_params": dict() })
+    return Command(goto = END, update = { "messages": [], "requested_agent": None, "nodes_params": dict(), "node_history": [N.CHATBOT] })

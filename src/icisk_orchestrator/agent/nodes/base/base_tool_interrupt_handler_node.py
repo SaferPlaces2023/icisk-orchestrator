@@ -295,7 +295,7 @@ class BaseToolInterruptOutputConfirmationHandler(BaseToolInterruptHandler):
             system_message = SystemMessage(content="User choose to exit the tool process.")
             return {
                 'goto': END,
-                'update': { "messages": [remove_tool_message, system_message] }
+                'update': { "messages": [remove_tool_message, system_message]}
             }
 
 

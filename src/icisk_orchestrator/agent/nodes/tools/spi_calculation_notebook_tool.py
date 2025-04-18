@@ -17,7 +17,7 @@ from agent import utils
 from agent.common import names as N
 from agent.nodes.base import BaseAgentTool
 
-from db import DBI
+from db import DBI, DBS
 
 
 
@@ -78,9 +78,8 @@ class SPICalculationNotebookTool(BaseAgentTool):
             default = None
         )
         
-    
     # DOC: Additional tool args
-    notebook: nbf.NotebookNode = nbf.v4.new_notebook()
+    notebook: DBS.Notebook = None
 
 
     # DOC: Initialize the tool with a name, description and args_schema
@@ -158,11 +157,15 @@ class SPICalculationNotebookTool(BaseAgentTool):
     
      # DOC: Preapre notebook cell code template
     def prepare_notebook(self, jupyter_notebook):
-        existing_jupyter_notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=True)
-        if existing_jupyter_notebook is not None:
-            self.notebook = existing_jupyter_notebook
+        self.notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=False)
+        if self.notebook is None:
+            self.notebook = DBS.Notebook(
+                name = jupyter_notebook,
+                authors = self.graph_state.get('user_id'),
+                source = nbf.v4.new_notebook()
+            )
             
-        self.notebook.cells.extend([
+        self.notebook.source.cells.extend([
             nbf.v4.new_code_cell("""
                 # Section "Dependencies"
 
@@ -424,17 +427,10 @@ class SPICalculationNotebookTool(BaseAgentTool):
             'reference_period': reference_period,
             'period_of_interest': period_of_interest,
         }
-        for cell in self.notebook.cells:
+        for cell in self.notebook.source.cells:
             if cell.cell_type in ("markdown", "code"):
                 cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
-        
-        DBI.save_notebook(
-            notebook_id = self.notebook.get('_id', None),
-            notebook_name = self.notebook.get('name', jupyter_notebook),
-            notebook_source = self.notebook['source'],
-            authors = self.notebook.get('authors', self.graph_state.get('user_id')),
-            notebook_description = self.notebook.get('description', None)
-        )
+        DBI.save_notebook(**self.notebook.as_dict)
         
         return {
             "notebook": jupyter_notebook

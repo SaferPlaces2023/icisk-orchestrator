@@ -7,6 +7,8 @@ import ast
 import uuid
 import tempfile
 
+from typing import Sequence
+
 from langchain_openai import ChatOpenAI
 
 from langchain_core.messages import RemoveMessage, AIMessage
@@ -121,6 +123,10 @@ def ask_llm(role, message, llm=_base_llm, eval_output=False):
 
 
 # REGION: [Message utils funtion]
+
+def merge_sequences(left: Sequence[str], right: Sequence[str]) -> Sequence[str]:
+    """Add two lists together."""
+    return left + right
 
 def is_ai_message(message):
     return message.type == 'ai'

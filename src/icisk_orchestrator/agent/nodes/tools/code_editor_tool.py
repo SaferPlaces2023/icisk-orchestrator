@@ -14,7 +14,7 @@ from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
 
-from db import DBI
+from db import DBI, DBS
 
 
 
@@ -44,7 +44,7 @@ class CodeEditorTool(BaseAgentTool):
         )
         
     # DOC: Additional tool args
-    notebook: dict = dict()
+    notebook: DBS.Notebook = None
     
     
     # DOC: Initialize the tool with a name, description and args_schema
@@ -78,23 +78,15 @@ class CodeEditorTool(BaseAgentTool):
         self.notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=source, retrieve_source=True)
         
         def get_source_code():
-            source_code = [cell.source for cell in nbf.reads(self.notebook['source'], as_version=4).cells if cell.cell_type == 'code' and cell.source != '']
+            source_code = [cell.source for cell in self.notebook.source.cells if cell.cell_type == 'code' and cell.source != '']
             return source_code
         
         def add_source_code(source_code):
-            if source_code.startswith('```python'):
-                source_code = source_code.split('```python')[1].split('```')[0]
+            if source_code.startswith('```python\n'):
+                source_code = source_code.split('```python\n')[1].split('\n```')[0]
             
-            nb = nbf.reads(self.notebook['source'], as_version=4)
-            nb.cells.append(new_code_cell(source = source_code))
-            self.notebook['source'] = nb
-            DBI.save_notebook(
-                notebook_id = self.notebook.get('_id', None),
-                notebook_name = self.notebook.get('name', source),
-                notebook_source = self.notebook['source'],
-                authors = self.notebook.get('authors', self.graph_state.get('user_id')),
-                notebook_description = self.notebook.get('description', None)
-            )
+            self.notebook.source.cells.append(new_code_cell(source = source_code))
+            DBI.save_notebook(**self.notebook.as_dict)
                     
         if not self.output_confirmed:
             

@@ -6,6 +6,7 @@ import asyncio
 import streamlit as st
 
 from db import DBI
+from agent.nodes.base.base_tool_interrupt import BaseToolInterrupt
 from webapp import langgraph_interface as lgi
 
 
@@ -28,14 +29,24 @@ class GUI():
         return self.file_downloader.get(filename, dict()).get('requested', False)
 
 
+class Interrupt():
+    
+    def __init__(self, interrupt_type: BaseToolInterrupt.BaseToolInterruptType, resume_key: str = 'response', interrupt_data: dict = dict()):
+        self.interrupt_type = interrupt_type
+        self.resume_key = resume_key
+        self.interrupt_data = interrupt_data if interrupt_data is not None else dict()
+        
+
 class WebAppState():
     
     def __init__(self, user_id):
         self.user_id = user_id
         self.thread_id = asyncio.run(lgi.create_thread(lgi.get_langgraph_client(), self.user_id))
-        self.chat_history = []  # INFO: this is relative to Chat Messages (to be rendered in GUI)
-        self.gui = GUI()  # INFO: this is relative to GUI Components properties
-        self.graph_messages = []  # INFO: this is relative to Graph State Messages
+        self.chat_history = []                      # DOC: relative to Chat Messages (to be rendered in GUI)
+        self.gui = GUI()                            # DOC: relative to GUI Components properties
+        self.graph_messages = []                    # DOC: relative to Graph State Messages
+        self.node_history = []                      # DOC: relative to graph visited node history
+        self.interrupt: Interrupt = None            # DOC: graph is interrupted, we have to handle resume command  
     
     
 class SessionManager():
@@ -74,11 +85,27 @@ class SessionManager():
     def graph_messages(self):
         return st.session_state.app.graph_messages if hasattr(st.session_state, 'app') else None
     
+    @property
+    def node_history(self):
+        return st.session_state.app.node_history if hasattr(st.session_state, 'app') else None
+    @node_history.setter
+    def node_history(self, value):
+        self.node_history.append(value) if hasattr(st.session_state, 'app') else None
+    
+    @property
+    def interrupt(self) -> Interrupt | None:
+        return st.session_state.app.interrupt if hasattr(st.session_state, 'app') else None
+    @interrupt.setter
+    def interrupt(self, value: Interrupt | None):
+        if hasattr(st.session_state, 'app'):
+            st.session_state.app.interrupt = value
+    
     
     def is_interrupted(self):
-        if len(self.graph_messages) > 0:
-            return self.graph_messages[-1].get("is_interrupt", False)
-        return False
+        return self.interrupt is not None
+        # if len(self.graph_messages) > 0:
+        #     return self.graph_messages[-1].get("is_interrupt", False)
+        # return False
     
     def get_interrupt_key(self):
         if self.is_interrupted():

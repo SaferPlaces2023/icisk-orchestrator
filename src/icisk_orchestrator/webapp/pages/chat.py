@@ -13,7 +13,7 @@ from st_copy_to_clipboard import st_copy_to_clipboard
 
 from webapp import utils
 from webapp import langgraph_interface as lgi
-from webapp.session.state import session_manager
+from webapp.session.state import session_manager, Interrupt, BaseToolInterrupt
 
 from db import DBI
 
@@ -73,8 +73,8 @@ def render_agent_response(message):
             render_message("tool", content)
     
     if len(message.get('content', [])) > 0:
-        if message.get('is_interrupt', False):
-            message['content'] = f"**Interaction required [ _{message['interrupt_type']}_ ]: 💬**\n\n{message['content']}"
+        if message.get('interrupt', False):
+            message['content'] = f"**Interaction required [ _{message['interrupt'].interrupt_type}_ ]: 💬**\n\n{message['content']}"
         render_message("assistant", message['content'])
         
         
@@ -87,7 +87,8 @@ def handle_response(response):
             message = messages[-1] if len(messages) > 0 else None
         elif author == '__interrupt__':
             message = data[0].get('value', None) if len(data) > 0 else None
-            message['is_interrupt'] = True
+            session_manager.interrupt = Interrupt(interrupt_type = message['interrupt_type'], resume_key=message.get('resume_key', 'response'))
+            message['interrupt'] = session_manager.interrupt
         
         if message is not None and message.get('type', None) != 'system':
             render_agent_response(message)
@@ -98,10 +99,19 @@ def handle_response(response):
 if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
     render_user_prompt(prompt)
     
-    async def run_chat():
-        additional_args = {}
+    def optional_resume_interrupt():
+        out = dict()
         if session_manager.is_interrupted():
-            additional_args['interrupt_response_key'] = session_manager.get_interrupt_key()
+            out['interrupt_response_key'] = session_manager.get_interrupt_key()
+            session_manager.interrupt = None
+        return out
+            
+    async def run_chat():
+        
+        additional_args = {
+            **optional_resume_interrupt(),
+        }        
+        
         async for message in lgi.ask_agent(
             session_manager.client, 
             session_manager.thread_id, 
@@ -124,7 +134,7 @@ with st.sidebar:
         
         else:
             for ifn,file_obj in enumerate(avaliable_files):
-                filename = file_obj['name']
+                filename = file_obj.name
                 col_name, col_view, col_download = st.columns([5, 1, 1], vertical_alignment="center")
                 
                 with col_name:
@@ -134,14 +144,14 @@ with st.sidebar:
                     if st.button("👁️", key=f"view_{filename}-{ifn}", help="view file"):
                         utils.dialog_notebook_code(
                             dialog_title = filename,
-                            notebook_code = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True)['source']
+                            notebook_code = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source,
                         )
                         
                 with col_download:
                     if session_manager.gui.is_requested_download(filename):
                         st.download_button(
                             label = "📥",
-                            data = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True)['source'],
+                            data = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source,
                             file_name = filename,
                             mime = "json/ipynb",
                             key = f"download_{filename}-{ifn}"
@@ -179,3 +189,29 @@ with st.sidebar:
     # TODO: Sidebar element (Will be used for displaying graph state)
     with st.expander("🔗 **Graph state** — _[ future dev ]_"):
         st.markdown("Graph state will be displayed here.")
+        from st_link_analysis import st_link_analysis, NodeStyle, EdgeStyle
+        elements = {
+            "nodes": [
+                { 
+                    "data": {
+                        "id": idn,
+                        "label": node
+                    } 
+                } 
+                for idn, node in enumerate(session_manager.node_history)
+            ],
+            "edges": [
+                { 
+                    "data": {
+                        "id": idn+len(session_manager.node_history), 
+                        "label": "next",
+                        "source": idn,
+                        "target": idn+1
+                    }
+                } 
+                for idn in range(len(session_manager.node_history)-1)
+            ],
+        }
+        # Render the component
+        st.markdown("### st-link-analysis: Example")
+        st_link_analysis(elements, "cose")

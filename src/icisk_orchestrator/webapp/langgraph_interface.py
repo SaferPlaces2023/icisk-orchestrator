@@ -44,6 +44,6 @@ async def ask_agent(
         if chunk.event == "updates":
             
             # Logger.info(fmsg("Received updates from agent", m=chunk.data, s=1, ls=True, pp=True))
-            print(f'Received updates from agent: {chunk.data}')
+            print(f'\n\nReceived updates from agent: {chunk.data} \n\n')
             
             yield chunk.data

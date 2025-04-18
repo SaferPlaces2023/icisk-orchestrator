@@ -17,11 +17,11 @@ def tool_args_md_table(args_dict):
         return table
     
     
-def dialog_notebook_code(dialog_title: str, notebook_code: str):
+def dialog_notebook_code(dialog_title: str, notebook_code: str | nbf.NotebookNode):
     
     @st.dialog(dialog_title, width="large")
     def show_ipynb_code(notebook_code: str):
-        notebook = nbf.reads(notebook_code, as_version=4)
+        notebook = nbf.reads(notebook_code, as_version=4) if isinstance(notebook_code, str) else notebook_code
         for cell in notebook.cells:
             if cell.cell_type == 'code':
                 st.code(cell.source, language='python')
