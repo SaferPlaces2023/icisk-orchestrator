@@ -44,6 +44,12 @@ for message in session_manager.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# FIXME: This is not workig. fix and substitute with the above code
+# if session_manager.chat is not None:
+#     for message in session_manager.chat.messages:
+#         with st.chat_message(message.get('role', 'user')):
+#             st.markdown(message.get("content", ''))
+
 
 
     
@@ -74,11 +80,10 @@ def render_agent_response(message):
     
     if len(message.get('content', [])) > 0:
         if message.get('interrupt', False):
-            message['content'] = f"**Interaction required [ _{message['interrupt'].interrupt_type}_ ]: 💬**\n\n{message['content']}"
+            message['content'] = f"**Interaction required [ _{message['interrupt']['interrupt_type']}_ ]: 💬**\n\n{message['content']}"
         render_message("assistant", message['content'])
-        
-        
-        
+
+   
 def handle_response(response):
     for author, data in response.items():
         message = None
@@ -88,17 +93,23 @@ def handle_response(response):
         elif author == '__interrupt__':
             message = data[0].get('value', None) if len(data) > 0 else None
             session_manager.interrupt = Interrupt(interrupt_type = message['interrupt_type'], resume_key=message.get('resume_key', 'response'))
-            message['interrupt'] = session_manager.interrupt
+            message['interrupt'] = session_manager.interrupt.as_dict
+        
+        session_manager.update_chat(message)
         
         if message is not None and message.get('type', None) != 'system':
             render_agent_response(message)
-        
-        session_manager.graph_messages.append(message)
+        # st.rerun()  # TODO: Wille substitute above code (works with the fixme code above)
             
     
             
 if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
+    session_manager.update_chat({"type": "human", "content": prompt})
     render_user_prompt(prompt)
+    
+    print('\n\n')
+    print(f"Chat:", session_manager.chat.messages)
+    print('\n\n')
     
     def optional_resume_interrupt():
         out = dict()
@@ -120,6 +131,7 @@ if prompt := st.chat_input(key="chat-input", placeholder="Scrivi un messaggio"):
             **additional_args
         ):
             handle_response(message)
+        
     
     asyncio.run(run_chat())
      
@@ -185,6 +197,11 @@ with st.sidebar:
     # TODO: Sidebar element (Will be used for previous chat)
     with st.expander("📜 **Previous chats** — _[ future dev ]_"):
         st.markdown("Previous chats will be displayed here.")
+        
+        chat_register = session_manager.gui.chat_register
+        
+        for chat in chat_register:
+            st.markdown(f"- **`{chat.title}`**")
         
 
     # TODO: Sidebar element (Will be used for displaying graph state)

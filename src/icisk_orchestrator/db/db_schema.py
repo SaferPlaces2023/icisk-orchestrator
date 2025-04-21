@@ -12,6 +12,7 @@ class Collections():
     
     USERS = 'users'
     NOTEBOOKS = 'notebooks'
+    CHATS = 'chats'
 
 
 class Record():
@@ -30,7 +31,10 @@ class Record():
         """
         Convert the record to a dictionary.
         """
-        return self.__dict__
+        dict_obj = self.__dict__
+        if dict_obj.get('_id') is None:
+            _ = dict_obj.pop('_id')
+        return dict_obj
     
     @classmethod
     def from_dict(cls, d):
@@ -56,6 +60,39 @@ class User(Record):
         obj = super().as_dict
         return obj
       
+
+
+class Chat(Record):
+    """
+    Class representing a chat in mongodb
+    """
+    
+    def __init__(self, user_id: str, thread_id: str, title: str, messages: list = [], **kwargs):
+        super().__init__(**kwargs)
+        self.user_id = user_id
+        self.thread_id = thread_id
+        self.title = title
+        self.messages = messages
+        self.pending_messages = []
+        
+    @property
+    def as_dict(self):
+        """
+        Convert the chat to a dictionary.
+        """
+        obj = super().as_dict
+        _ = obj.pop('pending_messages')
+        return obj
+    
+    def empty_pending(self):
+        self.pending_messages = []
+    
+    def add_messages(self, messages: list | dict):
+        """
+        Add a message to the chat.
+        """
+        self.messages.extend(messages if isinstance(messages, list) else [messages])
+        self.pending_messages.extend(messages if isinstance(messages, list) else [messages])
 
 
 class Notebook(Record):

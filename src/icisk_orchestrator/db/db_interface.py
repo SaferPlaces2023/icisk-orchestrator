@@ -160,6 +160,64 @@ class DatabaseInterface():
         return user
     
     
+    def chat_by_thread_id(self, thread_id: str):
+        self.connect()
+        chats_collection = self.db[DBS.Collections.CHATS]
+        chat = chats_collection.find_one({ 'thread_id': thread_id })
+        chat = db_utils.cast_to_schema(DBS.Chat, chat)
+        return chat
+    
+    
+    def update_chat(self, chat: DBS.Chat):
+        """
+        Update a chat in the database.
+        
+        Parameters:
+            _id (str | ObjectId): The ID of the chat.
+            user_id (str): The ID of the user.
+            messages (list | dict): The messages to be added to the chat.
+        """
+        
+        self.connect()
+        
+        chats_collection = self.db[DBS.Collections.CHATS]
+        
+        if self.chat_by_thread_id(thread_id = chat.thread_id) is None:
+            # DOC: If the chat does not exist, create a new one
+            chats_collection.insert_one(chat.as_dict)
+        else:
+            chats_collection.update_one(
+                { 'thread_id': chat.thread_id },
+                { "$push": { "messages": { "$each": chat.pending_messages } } }
+            )
+        
+        chat.empty_pending()
+        
+        
+    def chat_by_user_id(self, user_id: str, retrieve_messages: bool = False):
+        """
+        Retrieve a chat by its user ID.
+        
+        Parameters:
+            user_id (str): The ID of the user.
+        
+        Returns:
+            dict: Chat document.
+        """
+        
+        self.connect()
+        
+        chats_collection = self.db[DBS.Collections.CHATS]
+        
+        # DOC: Retrieve the chat by its user ID
+        chats = list(chats_collection.find({ 'user_id': user_id }, { 'messages': 0 }))
+        
+        chats = db_utils.cast_to_schema(DBS.Chat, chats)
+        
+        return chats
+                
+        
+    
 
 # DOC: Singleton instance of the DatabaseInterface class
 DBI = DatabaseInterface()
