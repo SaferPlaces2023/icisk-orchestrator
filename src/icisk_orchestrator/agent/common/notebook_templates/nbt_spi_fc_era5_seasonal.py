@@ -6,7 +6,7 @@ import nbformat as nbf
 notebook_template = nbf.v4.new_notebook()
 notebook_template.cells.extend([
     nbf.v4.new_code_cell("""
-        # Section "Dependencies"
+        # Section "install dependencies and import libs"
 
         %%capture
 
@@ -14,7 +14,6 @@ notebook_template.cells.extend([
         import math
         import datetime
         from dateutil.relativedelta import relativedelta
-        import getpass
 
         import numpy as np
         import pandas as pd
@@ -22,16 +21,12 @@ notebook_template.cells.extend([
 
         import scipy.stats as stats
         from scipy.special import gammainc, gamma
-        
-        import matplotlib.pyplot as plt
 
         !pip install "cdsapi>=0.7.4"
         import cdsapi
-        
-        !pip install cartopy
-        import cartopy.crs as ccrs
-        import cartopy.feature as cfeature
-    """, metadata={"check_import": True}),
+    """, 
+    metadata={"check_import": True}),
+    
     nbf.v4.new_code_cell("""
         # Section "Parameters"
 
@@ -41,10 +36,14 @@ notebook_template.cells.extend([
 
         reference_period = {reference_period} # start_year, end_year
 
-        period_of_interest = {period_of_interest} # start_month, end_month
+        init_time = datetime.datetime.strptime({init_time}, "%Y-%m")
+        
+        lead_time = datetime.datetime.strptime({lead_time}, "%Y-%m")
 
         cds_client = cdsapi.Client(url='https://cds.climate.copernicus.eu/api', key=getpass.getpass("YOUR CDS-API-KEY")) # CDS client
-    """, metadata={"need_format": True}),
+    """, 
+    metadata={"need_format": True}),
+    
     nbf.v4.new_code_cell("""
         filename = f'era5_land__total_precipitation__{{"_".join([str(c) for c in area])}}__monthly__{{reference_period[0]}}_{{reference_period[1]:02d}}.nc'
 
@@ -74,27 +73,40 @@ notebook_template.cells.extend([
             cds_client.retrieve(cds_dataset, cds_query, cds_out_filename)
 
         cds_ref_data = xr.open_dataset(cds_out_filename)
-    """),
+    """,
+    metadata={"check_existence": True}),
+    
     nbf.v4.new_code_cell("""
+        # Section "Retrieve period of interest data from CDS"
+
         # Get (Years, Years-Months) couple for the CDS api query. (We can query just one month at time)
-        period_of_interest = (datetime.datetime.strptime(period_of_interest[0], "%Y-%m"), datetime.datetime.strptime(period_of_interest[1], "%Y-%m"))
-        spi_start_date = period_of_interest[0] - relativedelta(months=spi_ts-1)
-        spi_years_range = list(range(spi_start_date.year, period_of_interest[1].year+1))
+        curr_date = datetime.datetime.now().date()
+        if init_time.strftime('%Y-%m') >= curr_date.strftime('%Y-%m'):
+            init_date = datetime.datetime.now().replace(day=1).date()
+        else:
+            init_date = init_time.replace(day=1)
+
+        start_hour = max(24, (init_time - init_date).days*24)
+        end_hour = min(5160, (lead_time - init_time).days*24 + start_hour)
+
+        # period_of_interest = (datetime.datetime.strptime(init_time, "%Y-%m"), datetime.datetime.strptime(lead_time, "%Y-%m"))
+        spi_start_date = init_time - relativedelta(months=spi_ts-1)
+        spi_years_range = list(range(spi_start_date.year, lead_time.year+1))
         spi_month_range = []
         for iy,year in enumerate(range(spi_years_range[0], spi_years_range[-1]+1)):
             if iy==0 and len(spi_years_range)==1:
-                spi_month_range.append([month for month in range(spi_start_date.month, period_of_interest[1].month+1)])
+                spi_month_range.append([month for month in range(spi_start_date.month, lead_time.month+1)])
             elif iy==0 and len(spi_years_range)>1:
                 spi_month_range.append([month for month in range(spi_start_date.month, 13)])
             elif iy>0 and iy==len(spi_years_range)-1:
-                spi_month_range.append([month for month in range(1, period_of_interest[1].month+1)])
+                spi_month_range.append([month for month in range(1, lead_time.month+1)])
             else:
                 spi_month_range.append([month for month in range(1, 13)])
 
-        def build_cds_hourly_data_filepath(year, month):
-            dataset_part = 'reanalysis_era5_land__total_precipitation__hourly'
-            time_part = f'{{year}}-{{month[0]:02d}}_{{year}}-{{month[-1]:02d}}'
-            filename = f'{{dataset_part}}__{{"_".join([str(c) for c in area])}}__{{time_part}}.nc'
+        def build_cds_hourly_data_filepath(start_year, start_month, end_year, end_month):
+            dataset_part = 'seasonal_original_single_levels__total_precipitation__daily'
+            time_part = f'{{start_year}}-{{start_month:02d}}' if start_year==end_year and start_month==end_month else f'{{start_year}}-{{start_month:02d}}_{{end_year}}-{{end_month:02d}}'
+            filename = f'{{dataset_part}}__{{"_".join([str(c) for c in region])}}__{{time_part}}.nc'
             filedir = os.path.join(out_dir, dataset_part)
             if not os.path.exists(filedir):
                 os.makedirs(filedir, exist_ok=True)
@@ -109,37 +121,46 @@ notebook_template.cells.extend([
             factor = 10 ** decimals
             return math.ceil(number * factor) / factor
 
-        # CDS API query
-        cds_poi_data_filepaths = []
-        for q_idx, (year,year_months) in enumerate(zip(spi_years_range, spi_month_range)):
-            for ym in year_months:
-                cds_poi_data_filepath = build_cds_hourly_data_filepath(year, [ym])
-                if not os.path.exists(cds_poi_data_filepath):
-                    cds_dataset = 'reanalysis-era5-land'
-                    cds_query =  {{
-                        'variable': 'total_precipitation',
-                        'year': [str(year)],
-                        'month': [f'{{month:02d}}' for month in year_months],
-                        'day': [f'{{day:02d}}' for day in range(1, 32)],
-                        'time': [f'{{hour:02d}}:00' for hour in range(0, 24)],
-                        'area': [
-                            ceil_decimals(area[3], 1),    # N
-                            floor_decimals(area[0], 1),   # W
-                            floor_decimals(area[1], 1),   # S
-                            ceil_decimals(area[2], 1),    # E
-                        ],
-                        "data_format": "netcdf",
-                        "download_format": "unarchived"
-                    }}
-                    cds_client.retrieve(cds_dataset, cds_query, cds_poi_data_filepath)
+        cds_poi_data_filepath = build_cds_hourly_data_filepath(init_time.year, init_time.month, lead_time.year, lead_time.month)
 
-            print(f'{{q_idx+1}}/{{len(year_months)}}/{{len(spi_years_range)}} - CDS API query completed')
-            cds_poi_data_filepaths.append(cds_poi_data_filepath)
+        if not os.path.exists(cds_poi_data_filepath):
+            cds_dataset = "seasonal-original-single-levels"
+            cds_query = {{
+                "originating_centre": "ecmwf",
+                "system": "51",
+                "variable": [
+                    "total_precipitation"
+                ],
+                "year": [str(init_date.year)],
+                "month": [f'{{init_date.month:02d}}'],
+                "day": ["01"],
+                "leadtime_hour": [str(h) for h in range(start_hour, end_hour+24, 24)],
+                "area": [
+                    ceil_decimals(region[3], 1),    # N
+                    floor_decimals(region[0], 1),   # W
+                    floor_decimals(region[1], 1),   # S
+                    ceil_decimals(region[2], 1),    # E
+                ],
+                "data_format": "netcdf",
+            }}
+            cds_client.retrieve(cds_dataset, cds_query, cds_poi_data_filepath)
 
-        cds_poi_data = [xr.open_dataset(fp) for fp in cds_poi_data_filepaths]
-        cds_poi_data = xr.concat(cds_poi_data, dim='valid_time')
-        cds_poi_data = cds_poi_data.sel(valid_time=(cds_poi_data.valid_time.dt.date>=period_of_interest[0].date()) & (cds_poi_data.valid_time.dt.date<=period_of_interest[1].date()))
+        cds_poi_data = xr.open_dataset(cds_poi_data_filepath)
+        cds_poi_data = xr.Dataset(
+            {{
+                'tp': (['model', 'time', 'lat', 'lon'], cds_poi_data.tp.values[:,0,:,:,:])
+            }},
+            coords={{
+                'model': np.arange(0,len(cds_poi_data.number),1),
+                'time': cds_poi_data.valid_time.values,
+                'lat': cds_poi_data.latitude.values,
+                'lon': cds_poi_data.longitude.values
+            }}
+        )
+        cds_poi_data = cds_poi_data.sortby(['time', 'lat', 'lon'])
+        cds_poi_data = cds_poi_data.sel(time=(cds_poi_data.time.dt.date>=init_time) & (cds_poi_data.time.dt.date<=lead_time))
     """),
+    
     nbf.v4.new_code_cell("""
         # Preprocess reference dataset
         cds_ref_data = cds_ref_data.drop_vars(['number', 'expver'])
@@ -152,12 +173,10 @@ notebook_template.cells.extend([
         cds_ref_data = cds_ref_data.sortby(['time', 'lat', 'lon'])
 
         # Preprocess period-of-interest dataset
-        cds_poi_data = cds_poi_data.drop_vars(['number', 'expver'])
-        cds_poi_data = cds_poi_data.rename({{'valid_time': 'time', 'latitude': 'lat', 'longitude': 'lon'}})
-        cds_poi_data = cds_poi_data.resample(time='1ME').sum()                                   # Resample to monthly total data
-        cds_poi_data = cds_poi_data.assign_coords(time=cds_poi_data.time.dt.strftime('%Y-%m-01'))  # Set month day to 01
+        cds_poi_data = cds_poi_data.resample(time='1ME').mean()                                     # Resample to monthly total data
+        cds_poi_data = cds_poi_data.assign_coords(time=cds_poi_data.time.dt.strftime('%Y-%m-01'))   # Set month day to 01
         cds_poi_data = cds_poi_data.assign_coords(time=pd.to_datetime(cds_poi_data.time))
-        cds_poi_data['tp'] = cds_poi_data['tp'] / 12                                              # Convert total precipitation to monthly average precipitation
+        cds_poi_data['tp'] = cds_poi_data['tp'] / 12                                                # Convert total precipitation to monthly average precipitation
         cds_poi_data = cds_poi_data.assign_coords(
             lat=np.round(cds_poi_data.lat.values, 6),
             lon=np.round(cds_poi_data.lon.values, 6),
@@ -168,6 +187,7 @@ notebook_template.cells.extend([
         ts_dataset = xr.concat([cds_ref_data, cds_poi_data], dim='time')
         ts_dataset = ts_dataset.drop_duplicates(dim='time').sortby(['time', 'lat', 'lon'])
     """),
+    
     nbf.v4.new_code_cell("""
         # Compute SPI function
         def compute_timeseries_spi(monthly_data, spi_ts, nt_return=1):
@@ -188,6 +208,8 @@ notebook_template.cells.extend([
                 t_scaled_monthly_data = df.rolling(spi_ts).sum().monthly_data.iloc[spi_ts:]
             else:
                 t_scaled_monthly_data = df.monthly_data
+                
+            t_scaled_monthly_data = t_scaled_monthly_data.fillna(1e-6)
 
             # Gamma fitted params
             a, _, b = stats.gamma.fit(t_scaled_monthly_data, floc=0)
@@ -238,15 +260,25 @@ notebook_template.cells.extend([
 
         spi_dataset = xr.concat(spi_grids, dim='time').to_dataset()
         spi_dataset = spi_dataset.assign_coords({{'time': spi_times}})
-        spi_dataset = spi_dataset.rename_vars({{'tp': 'spi'}})
+        spi_dataset = spi_dataset.rename_vars({{'tp': 'spi_fc'}})
 
-        spi_values = spi_dataset.spi.values
+        spi_dataset = spi_dataset.transpose('model', 'time', 'lat', 'lon')
     """),
     nbf.v4.new_code_cell("""
-        # variable "spi_dataset" is a xarray.Dataset with three dimensions ('time', 'lat', 'lon') and a 'spi' var related to those dimensions
-        display(spi_dataset)
+       # Section "Describe dataset"
 
-        # variable "spi_values" is a numpy.array with shape (time, lat, lon) and it is representig numerical values of spi index over each time for each lat-lon cell
-        display(spi_values) 
+        \"\"\"
+        Object "dataset" is a xarray.Dataset
+        It has four dimensions named:
+        - 'model': list of model ids 
+        - 'time': forecast timesteps
+        - 'lat': list of latitudes, 
+        - 'lon': list of longitudes,
+        It has 1 variables named spi_fc representing the spi forecast values. It has a shape of [model, time, lat, lon].
+        \"\"\"
+
+        # Use this dataset variable to do next analysis or plots
+
+        display(spi_dataset)
     """)
 ])

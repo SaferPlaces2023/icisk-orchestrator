@@ -15,7 +15,7 @@ from langchain_core.callbacks import (
 
 from agent import utils
 from agent.common import names as N
-from agent.common.notebook_templates.nbt_spi import notebook_template as nbt_spi_template
+from agent.common.notebook_templates.nbt_spi_hist_era5_hourly import notebook_template as nbt_spi_hist_era5_hourly
 from agent.nodes.base import BaseAgentTool
 
 from db import DBI, DBS
@@ -166,7 +166,7 @@ class SPIHistoricNotebookTool(BaseAgentTool):
                 source = nbf.v4.new_notebook()
             )
           
-        self.notebook.source.cells.extend(nbt_spi_template.cells)    
+        self.notebook.source.cells.extend(nbt_spi_hist_era5_hourly.cells)    
         
         
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file

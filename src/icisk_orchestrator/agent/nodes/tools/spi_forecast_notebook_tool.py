@@ -1,6 +1,6 @@
 import os
 import datetime
-import dateutil.relativedelta
+from dateutil import relativedelta
 
 from enum import Enum
 
@@ -15,7 +15,8 @@ from langchain_core.callbacks import (
 
 from agent import utils
 from agent.common import names as N
-from agent.common.notebook_templates.nbt_spi import notebook_template as nbt_spi_template
+from agent.common.notebook_templates.nbt_spi_fc_era5_seasonal import notebook_template as nbt_spi_fc_era5_seasonal
+
 from agent.nodes.base import BaseAgentTool
 
 from db import DBI, DBS
@@ -56,16 +57,38 @@ class SPIForecastNotebookTool(BaseAgentTool):
             ],
             default = (1981, 2010)
         )
-        period_of_interest: None | tuple = Field(
-            title = "Period of Interest",
-            description = f"Tuple of two elements representing the start and end month in YYYY-MM format of the period of interest for which SPI has to be calculated. Default is form current to next month { tuple( [ datetime.datetime.now().strftime('%Y-%m'), (datetime.datetime.now() + dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m') ] ) }",
+        # period_of_interest: None | tuple = Field(
+        #     title = "Period of Interest",
+        #     description = f"Tuple of two elements representing the start and end month in YYYY-MM format of the period of interest for which SPI has to be calculated. Default is form current to next month { tuple( [ datetime.datetime.now().strftime('%Y-%m'), (datetime.datetime.now() + dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m') ] ) }",
+        #     examples = [
+        #         None,
+        #         ("2025-01", "2025-02"),
+        #         ("2024-12", "2025-01"),
+        #         ("2024-03", "2025-03"),
+        #     ],
+        #     default = tuple( [ (datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m') ] )
+        # )
+        init_time: None | str = Field(
+            title = "Initialization Time",
+            description = f"The date of the forecast initialization provided in UTC-0 YYYY-MM-DD. If not specified use {datetime.datetime.now().strftime('%Y-%m-01')} as default.",
             examples = [
                 None,
-                ("2025-01", "2025-02"),
-                ("2024-12", "2025-01"),
-                ("2024-03", "2025-03"),
+                "2025-01-01",
+                "2025-02-01",
+                "2025-03-10",
             ],
-            default = tuple( [ (datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m') ] )
+            default = None
+        )
+        lead_time: None | str = Field(
+            title = "Lead Time",
+            description = f"The end date of the forecast lead time provided in UTC-0 YYYY-MM-DD. If not specified use: {(datetime.datetime.now().date().replace(day=1) + datetime.timedelta(days=31)).strftime('%Y-%m-01')} as default.",
+            examples = [
+                None,
+                "2025-02-01",
+                "2025-03-01",
+                "2025-04-10",
+            ],
+            default = None
         )
         jupyter_notebook: None | str = Field(
             title = "Jupyter Notebook",
@@ -110,17 +133,29 @@ class SPIForecastNotebookTool(BaseAgentTool):
                 lambda **ka: f"Invalid reference_period: {ka['reference_period']}. It should be in the past, at least in the previous year."
                     if ka['reference_period'][1] > datetime.datetime.now().year else None
             ],
-            'period_of_interest': [ # TODO: Strictly forecast periods!
-                lambda **ka: f"Invalid period_of_interest: {ka['period_of_interest']}. It should be a tuple of two elements representing the start and end month in YYYY-MM format."
-                    if type(ka['period_of_interest']) not in (tuple, list) or len(ka['period_of_interest']) != 2 else None,
-                lambda **ka: f"Invalid start period_of_interest: {ka['period_of_interest'][0]}. It should be in the format YYYY-MM."
-                    if utils.try_default(lambda: datetime.datetime.strptime(ka['period_of_interest'][0], "%Y-%m"), None) is None else None,
-                lambda **ka: f"Invalid end period_of_interest: {ka['period_of_interest'][1]}. It should be in the format YYYY-MM."
-                    if utils.try_default(lambda: datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m"), None) is None else None,
-                lambda **ka: f"Invalid lead time: {ka['period_of_interest'][1]}. It should be greater than start period_of_interest {ka['period_of_interest'][0]}."
-                    if datetime.datetime.strptime(ka['period_of_interest'][0], "%Y-%m") >= datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m") else None,
-                lambda **ka: f"Invalid period_of_interest: {ka['period_of_interest']}. It can't be mor than six months in the future."
-                    if datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m") > (datetime.datetime.now() + dateutil.relativedelta.relativedelta(months=6)) else None,
+            # 'period_of_interest': [ # TODO: Strictly forecast periods!
+            #     lambda **ka: f"Invalid period_of_interest: {ka['period_of_interest']}. It should be a tuple of two elements representing the start and end month in YYYY-MM format."
+            #         if type(ka['period_of_interest']) not in (tuple, list) or len(ka['period_of_interest']) != 2 else None,
+            #     lambda **ka: f"Invalid start period_of_interest: {ka['period_of_interest'][0]}. It should be in the format YYYY-MM."
+            #         if utils.try_default(lambda: datetime.datetime.strptime(ka['period_of_interest'][0], "%Y-%m"), None) is None else None,
+            #     lambda **ka: f"Invalid end period_of_interest: {ka['period_of_interest'][1]}. It should be in the format YYYY-MM."
+            #         if utils.try_default(lambda: datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m"), None) is None else None,
+            #     lambda **ka: f"Invalid lead time: {ka['period_of_interest'][1]}. It should be greater than start period_of_interest {ka['period_of_interest'][0]}."
+            #         if datetime.datetime.strptime(ka['period_of_interest'][0], "%Y-%m") >= datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m") else None,
+            #     lambda **ka: f"Invalid period_of_interest: {ka['period_of_interest']}. It can't be mor than six months in the future."
+            #         if datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m") > (datetime.datetime.now() + dateutil.relativedelta.relativedelta(months=6)) else None,
+            # ],
+            'init_time': [
+                lambda **ka: f"Invalid initialization time: {ka['init_time']}. It should be in the format YYYY-MM-DD."
+                    if ka['init_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['init_time'], "%Y-%m-%d"), None) is None else None,
+                lambda **ka: f"Invalid initialization time: {ka['init_time']}. It should be in the past, at least in the previous month."
+                    if ka['init_time'] is not None and datetime.datetime.strptime(ka['init_time'], '%Y-%m-%d') > datetime.datetime.now() else None
+            ],
+            'lead_time': [
+                lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be in the format YYYY-MM-DD."
+                    if ka['lead_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['lead_time'], "%Y-%m-%d"), None) is None else None,
+                lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be in the after the init time."
+                    if ka['init_time'] is not None and ka['lead_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') < datetime.datetime.strptime(ka['init_time'], '%Y-%m-%d'), False) else None,
             ],
             'jupyter_notebook': [
                 lambda **ka: f"Invalid notebook path: {ka['jupyter_notebook']}. It should be a valid jupyter notebook file path."
@@ -145,7 +180,15 @@ class SPIForecastNotebookTool(BaseAgentTool):
                 return area
             return bounding_box_from_location_name(ka['area'])
         
-        # TODO: Assign default periods if null (see cds)
+        def infer_init_time(**ka):
+            if ka['init_time'] is None:
+                return datetime.datetime.now().strftime('%Y-%m-01')
+            return ka['init_time']
+        
+        def infer_lead_time(**ka):
+            if ka['lead_time'] is None:
+                return (datetime.datetime.now().date().replace(day=1) + relativedelta.relativedelta(month=1)).strftime('%Y-%m-01')
+            return ka['lead_time']
         
         def infer_jupyter_notebook(**ka):
             if ka['jupyter_notebook'] is None:
@@ -154,6 +197,8 @@ class SPIForecastNotebookTool(BaseAgentTool):
         
         return {
             'area': infer_area,
+            'init_time': infer_init_time,
+            'lead_time': infer_lead_time,
             'jupyter_notebook': infer_jupyter_notebook
         }
         
@@ -168,7 +213,7 @@ class SPIForecastNotebookTool(BaseAgentTool):
                 source = nbf.v4.new_notebook()
             )
           
-        self.notebook.source.cells.extend(nbt_spi_template.cells)    
+        self.notebook.source.cells.extend(nbt_spi_fc_era5_seasonal.cells)    
         
         
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file
@@ -176,7 +221,9 @@ class SPIForecastNotebookTool(BaseAgentTool):
         self,
         area: str | list[float],
         reference_period: tuple = (1981, 2010),
-        period_of_interest: tuple = ((datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m')),
+        # period_of_interest: tuple = ((datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m')),
+        init_time: str = None,
+        lead_time: str = None,
         jupyter_notebook: str = None,
     ): 
         # TODO: move to utils
@@ -191,7 +238,9 @@ class SPIForecastNotebookTool(BaseAgentTool):
         nb_values = {
             'area': area,
             'reference_period': reference_period,
-            'period_of_interest': period_of_interest,
+            # 'period_of_interest': period_of_interest,
+            'init_time': init_time,
+            'lead_time': lead_time
         }
         for ic,cell in enumerate(self.notebook.source.cells):
             if cell.cell_type in ("markdown", "code"):
@@ -214,7 +263,9 @@ class SPIForecastNotebookTool(BaseAgentTool):
         self, 
         area: str | list[float],
         reference_period: tuple = (1981, 2010),
-        period_of_interest: tuple = ((datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m')),
+        # period_of_interest: tuple = ((datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m')),
+        init_time: str = None,
+        lead_time: str = None,
         jupyter_notebook: str = None,
         run_manager: None | Optional[CallbackManagerForToolRun] = None
     ) -> dict:
@@ -223,7 +274,9 @@ class SPIForecastNotebookTool(BaseAgentTool):
             tool_args = {
                 "area": area,
                 "reference_period": reference_period,
-                "period_of_interest": period_of_interest,
+                # "period_of_interest": period_of_interest,
+                'init_time': init_time,
+                'lead_time': lead_time,
                 "jupyter_notebook": jupyter_notebook
             },
             run_manager=run_manager

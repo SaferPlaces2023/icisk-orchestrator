@@ -7,6 +7,8 @@ import ast
 import uuid
 import tempfile
 
+import nbformat as nbf
+
 from typing import Sequence
 
 from langchain_openai import ChatOpenAI
@@ -138,4 +140,27 @@ def remove_tool_messages(tool_messages):
         return [remove_message(tm.id) for tm in tool_messages]
     
 # ENDREGION: [Message utils funtion]
+
+
+
+# REGION: [ Notebook utils ]
+
+def write_notebook_template(notebook_template: nbf.NotebookNode, values_dict: dict = dict()) -> nbf.NotebookNode:
     
+    def necessary_imports(code: str | list[str], context_code: str | list[str] = None):
+            lines = code if type(code) is list else [code]
+            context_code = context_code if type(context_code) is list else [context_code] if context_code is not None else []
+            lines = [ l for l in lines if l.strip() not in context_code ]
+            return '\n'.join(lines)
+    
+    for ic,cell in enumerate(notebook_template.cells):
+        if cell.cell_type in ("markdown", "code"):
+            cell.source = safe_code_lines(cell.source, format_dict=values_dict if cell.metadata.get("need_format", False) else None)
+            if cell.metadata.get("check_import", False):
+                previous_import_code = '\n'.join([c.source for c in self.notebook.source.cells[:ic] if c.metadata.get("check_import", False)])
+                cell.source = necessary_imports(cell.source, context_code=previous_import_code)
+    
+
+
+
+# ENDREGION: [ Notebook utils ]

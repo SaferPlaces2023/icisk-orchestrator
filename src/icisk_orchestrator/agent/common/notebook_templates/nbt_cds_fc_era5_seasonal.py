@@ -153,7 +153,7 @@ notebook_template.cells.extend([
 
         \"\"\"
         Object "dataset" is a xarray.Dataset
-        It has  three dimensions named:
+        It has four dimensions named:
         - 'model': list of model ids 
         - 'lat': list of latitudes, 
         - 'lon': list of longitudes,
