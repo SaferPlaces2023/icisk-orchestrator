@@ -32,6 +32,11 @@ class Record():
         Convert the record to a dictionary.
         """
         dict_obj = self.__dict__
+        return dict_obj
+    
+    @property
+    def as_anon_dict(self):
+        dict_obj = self.as_dict
         if dict_obj.get('_id') is None:
             _ = dict_obj.pop('_id')
         return dict_obj
@@ -82,7 +87,7 @@ class Chat(Record):
         """
         obj = super().as_dict
         _ = obj.pop('pending_messages')
-        return obj
+        return obj        
     
     def empty_pending(self):
         self.pending_messages = []
@@ -122,4 +127,11 @@ class Notebook(Record):
         obj = super().as_dict
         obj['source'] = nbf.writes(self.source)
         return obj
+    
+    @property
+    def source_code(self):
+        """
+        Convert the notebook source to a string.
+        """
+        return nbf.writes(self.source)
     

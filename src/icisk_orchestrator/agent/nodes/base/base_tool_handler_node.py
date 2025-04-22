@@ -63,7 +63,7 @@ class BaseToolHandlerNode:
                 result = tool.invoke(tool_call['args'])
             except BaseToolInterrupt as tool_interrupt:                
                 update_state = {}
-                update_state['nodes_params'] = { 
+                update_state['node_params'] = { 
                     self.tool_interrupt_node_name: {
                         'tool_message': tool_message,
                         'tool_interrupt': tool_interrupt.as_dict,
@@ -80,6 +80,8 @@ class BaseToolHandlerNode:
             }
             
             return {"messages": tool_response_message, **self.additional_ouput_state}
+                
+                
 
         # DOC: Creating the tool handler function using the template function.
         tool_handler = types.FunctionType(

@@ -17,3 +17,4 @@ class BaseGraphState(MessagesState):
     """Basic state"""
     user_id: str = None
     node_history: Annotated[Sequence[str], merge_sequences] = []
+    node_params: dict = dict()

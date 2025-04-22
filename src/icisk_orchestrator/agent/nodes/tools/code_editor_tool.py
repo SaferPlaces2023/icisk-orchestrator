@@ -86,7 +86,7 @@ class CodeEditorTool(BaseAgentTool):
                 source_code = source_code.split('```python\n')[1].split('\n```')[0]
             
             self.notebook.source.cells.append(new_code_cell(source = source_code))
-            DBI.save_notebook(**self.notebook.as_dict)
+            DBI.save_notebook(self.notebook)#**self.notebook.as_dict)
                     
         if not self.output_confirmed:
             

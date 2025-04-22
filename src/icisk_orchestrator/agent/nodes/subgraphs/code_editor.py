@@ -30,7 +30,7 @@ llm_with_code_editor_tools = utils._base_llm.bind_tools(code_editor_tools)
 
 # DOC: This is for store some information that could be util for the nodes in the subgraph. N.B. Keys are node names, values are a custom dict
 class CodeEditorState(BaseGraphState):
-    nodes_params: dict
+    node_params: dict
     
     
 
@@ -40,7 +40,7 @@ code_editor_tool_handler = BaseToolHandlerNode(
     tool_handler_node_name = N.CODE_EDITOR_TOOL_HANDLER,
     tool_interrupt_node_name = N.CODE_EDITOR_TOOL_INTERRUPT,
     tools = code_editor_tools_dict,
-    additional_ouput_state = { 'requested_agent': None, 'nodes_params': dict() }
+    additional_ouput_state = { 'requested_agent': None, 'node_params': dict() }
 )
 
 

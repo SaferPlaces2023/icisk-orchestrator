@@ -26,7 +26,7 @@ llm_with_spi_tools = utils._base_llm.bind_tools(spi_tools)
 
 # DOC: This is for store some information that could be util for the nodes in the subgraph. N.B. Keys are node names, values are a custom dict
 class SPIState(BaseGraphState):
-    nodes_params: dict
+    node_params: dict
     
     
 
@@ -36,7 +36,7 @@ spi_calculation_tool_handler = BaseToolHandlerNode(
     tool_handler_node_name = N.SPI_CALCULATION_TOOL_HANDLER,
     tool_interrupt_node_name = N.SPI_CALCULATION_TOOL_INTERRUPT,
     tools = spi_calculation_tools_dict,
-    additional_ouput_state = { 'requested_agent': None, 'nodes_params': dict() }
+    additional_ouput_state = { 'requested_agent': None, 'node_params': dict() }
 )
 
 

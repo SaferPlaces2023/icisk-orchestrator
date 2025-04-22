@@ -11,7 +11,7 @@ from agent import names as N
 from agent.common.states import BaseGraphState
 
 from agent.nodes import (
-    chatbot
+    chatbot, chatbot_update_messages
 )
 from agent.nodes.subgraphs import (
     cds_ingestor_subgraph, 
@@ -27,6 +27,7 @@ graph_builder = StateGraph(BaseGraphState)
 # DOC: define nodes
 
 graph_builder.add_node(chatbot)
+graph_builder.add_node(N.CHATBOT_UPDATE_MESSAGES, chatbot_update_messages)
 
 graph_builder.add_node(N.CDS_FORECAST_SUBGRAPH, cds_ingestor_subgraph)
 
@@ -38,6 +39,8 @@ graph_builder.add_node(N.CODE_EDITOR_SUBGRAPH, code_editor_subgraph)
 # DOC: define edges
 
 graph_builder.add_edge(START, N.CHATBOT)
+graph_builder.add_edge(N.CHATBOT_UPDATE_MESSAGES, N.CHATBOT)
+
 
 graph_builder.add_edge(N.CDS_FORECAST_SUBGRAPH, N.CHATBOT)
 

@@ -1,3 +1,4 @@
+from .cds_historic_notebook_tool import CDSHistoricNotebookTool
 from .cds_forecast_notebook_tool import CDSForecastNotebookTool
 from .spi_calculation_notebook_tool import SPICalculationNotebookTool
 from .code_editor_tool import CodeEditorTool

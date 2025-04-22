@@ -36,11 +36,12 @@ class DatabaseInterface():
     
     def save_notebook(
         self, 
-        _id: str | ObjectId,
-        name: str,
-        source: str | nbf.NotebookNode,
-        authors: str | list[str],
-        description: str = None
+        notebook: DBS.Notebook,
+        # _id: str | ObjectId,
+        # name: str,
+        # source: str | nbf.NotebookNode,
+        # authors: str | list[str],
+        # description: str = None
     ):
         """
         Save a notebook to the database.
@@ -56,36 +57,36 @@ class DatabaseInterface():
         
         notebooks_collection = self.db[DBS.Collections.NOTEBOOKS]     # TODO: Move names to db-schema-class
         
-        # DOC: If source is a string, it is converted to a NotebookNode object
-        if isinstance(source, str):
-            source = nbf.reads(source, as_version=4)
+        # # DOC: If source is a string, it is converted to a NotebookNode object
+        # if isinstance(source, str):
+        #     source = nbf.reads(source, as_version=4)
         
         # DOC: All notebooks will be visible to admin
-        if isinstance(authors, str):
-            authors = [ authors ]
-        if 'admin' not in authors:
-            authors.append('admin')
+        # if isinstance(authors, str):
+        #     authors = [ authors ]
+        if 'admin' not in notebook.authors:
+            notebook.authors.append('admin')
         
         # DOC: Create the notebook document to be inserted or updated in the collection
-        notebook_document = {
-            'name': name,
-            'source': nbf.writes(source),
-            'authors': authors,
-            'description': description,
-        }
+        # notebook_document = {
+        #     'name': notebook.name,
+        #     'source': nbf.writes(source),
+        #     'authors': authors,
+        #     'description': notebook.description,
+        # }
         
         # DOC: If notebook_id is None, we are creating a new notebook, otherwise we are updating an existing one
-        if _id is None:
-            insert_result = notebooks_collection.insert_one(notebook_document)
+        if notebook._id is None:
+            insert_result = notebooks_collection.insert_one(notebook.as_anon_dict)
             print(f'Inserted notebook result: {insert_result}')
         else:
             notebooks_collection.update_one(
-                { '_id': ObjectId(_id) if isinstance(_id, str) else _id },
-                { '$set': notebook_document }
+                { '_id': notebook._id },
+                { '$set': notebook.as_anon_dict }
             )
             
             
-    def notebook_by_name(self, author: str, notebook_name: str, retrieve_source: bool = False):
+    def notebook_by_name(self, author: str, notebook_name: str, retrieve_source: bool = False) -> DBS.Notebook:
         """
         Retrieve a notebook by its name.
         
@@ -184,7 +185,7 @@ class DatabaseInterface():
         
         if self.chat_by_thread_id(thread_id = chat.thread_id) is None:
             # DOC: If the chat does not exist, create a new one
-            chats_collection.insert_one(chat.as_dict)
+            chats_collection.insert_one(chat.as_anon_dict)
         else:
             chats_collection.update_one(
                 { 'thread_id': chat.thread_id },

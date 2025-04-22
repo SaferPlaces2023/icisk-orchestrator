@@ -116,9 +116,9 @@ class CDSForecastNotebookTool(BaseAgentTool):
             description = f"The end date of the forecast lead time provided in UTC-0 YYYY-MM-DD. If not specified use: {(datetime.datetime.now().date().replace(day=1) + datetime.timedelta(days=31)).strftime('%Y-%m-01')} as default.",
             examples = [
                 None,
-                "2023-02-01",
-                "2023-03-01",
-                "2023-04-10",
+                "2025-02-01",
+                "2025-03-01",
+                "2025-04-10",
             ],
             default = None
         )
@@ -257,7 +257,7 @@ class CDSForecastNotebookTool(BaseAgentTool):
     
     # DOC: Preapre notebook cell code template
     def prepare_notebook(self, jupyter_notebook):
-        self.notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=False)
+        self.notebook = DBI.notebook_by_name(author=self.graph_state.get('user_id'), notebook_name=jupyter_notebook, retrieve_source=True)
         if self.notebook is None:
             self.notebook = DBS.Notebook(
                 name = jupyter_notebook,
@@ -291,7 +291,7 @@ class CDSForecastNotebookTool(BaseAgentTool):
         for cell in self.notebook.source.cells:
             if cell.cell_type in ("markdown", "code"):
                 cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
-        DBI.save_notebook(**self.notebook.as_dict)
+        DBI.save_notebook(self.notebook)
         
         return {
             "data_source": zarr_output,

@@ -32,7 +32,7 @@ notebook_template.cells.extend([
         !pip install cartopy
         import cartopy.crs as ccrs
         import cartopy.feature as cfeature
-    """),
+    """, metadata={"check_import": True}),
     nbf.v4.new_code_cell("""
         # Section "Define constant"
 
@@ -147,7 +147,7 @@ notebook_template.cells.extend([
             data_vars = vars,
             coords = dims
         )
-    """),
+    """, metadata={"need_format": True}),
     nbf.v4.new_code_cell("""
         # Section "Describe dataset"
 
@@ -164,5 +164,5 @@ notebook_template.cells.extend([
         # Use this dataset variable to do next analysis or plots
 
         display(dataset)
-    """)
+    """, metadata={"need_format": True})
 ])

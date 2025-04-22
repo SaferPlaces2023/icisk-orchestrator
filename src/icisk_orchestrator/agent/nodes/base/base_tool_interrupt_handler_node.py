@@ -3,9 +3,10 @@ from typing_extensions import Literal
 
 from langgraph.graph import END
 from langgraph.types import Command, interrupt
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, RemoveMessage
 
 from agent import utils
+from agent import names as N
 from agent.nodes.base import BaseToolInterrupt
 
 
@@ -57,6 +58,7 @@ class BaseToolInterruptProvideArgsHandler(BaseToolInterruptHandler):
             If a value for an argument was not provided, then the value should be None.
             User can provide only some of the arguments.
             Reply with only the dictionary and nothing else.
+            If the user asked to interrupt the tool process and exit, return None and nothing else.
             """,
             eval_output = True
         ) 
@@ -73,14 +75,26 @@ class BaseToolInterruptProvideArgsHandler(BaseToolInterruptHandler):
         response = interruption.get('response', 'User did not provide any response.')
         provided_args = self._generate_provided_args(response)
         
-        self.tool_message.tool_calls[-1]["args"].update(provided_args if provided_args is not None else dict())
-        
-        return {
-            'goto': self.tool_handler_node,
-            'update': { 
-                "messages": [self.tool_message]
+        if provided_args is None:
+            remove_tool_message = RemoveMessage(self.tool_message.id)
+            system_message = SystemMessage(content=f"User choose to exit the tool process with this response: {response}")            
+            return {
+                'goto': END,
+                'update': { 
+                    "messages": [remove_tool_message, system_message],
+                    "node_params": { N.CHATBOT_UPDATE_MESSAGES: { "update_messages": [remove_tool_message, system_message] } }
+                }
             }
-        }      
+        
+        else:
+            self.tool_message.tool_calls[-1]["args"].update(provided_args if provided_args is not None else dict())           
+            return {
+                'goto': self.tool_handler_node,
+                'update': { 
+                    "messages": [self.tool_message]
+                }
+            }      
+        
         
         
 class BaseToolInterruptInvalidArgsHandler(BaseToolInterruptHandler):
@@ -115,6 +129,7 @@ class BaseToolInterruptInvalidArgsHandler(BaseToolInterruptHandler):
             The user replied: "{response}".
             If the user provided valid arguments, respond with a complete dictionary string keyed with the all the arguments they provided updated with what the user provided as a value, if any.
             Reply with only the dictionary string and nothing else.
+            If the user asked to interrupt the tool process and exit, return None and nothing else.
             """,
             eval_output = True
         ) 
@@ -131,14 +146,25 @@ class BaseToolInterruptInvalidArgsHandler(BaseToolInterruptHandler):
         response = interruption.get('response', 'User did not provide any response.')
         provided_args = self._generate_provided_args(response)
         
-        self.tool_message.tool_calls[-1]["args"].update(provided_args)
-        
-        return {
-            'goto': self.tool_handler_node,
-            'update': { 
-                "messages": [self.tool_message]
+        if provided_args is None:
+            remove_tool_message = RemoveMessage(self.tool_message.id)
+            system_message = SystemMessage(content=f"User choose to exit the tool process with this response: {response}")            
+            return {
+                'goto': END,
+                'update': { 
+                    "messages": [remove_tool_message, system_message],
+                    "node_params": { N.CHATBOT_UPDATE_MESSAGES: { "update_messages": [remove_tool_message, system_message] } }
+                }
             }
-        }
+            
+        else:
+            self.tool_message.tool_calls[-1]["args"].update(provided_args)  
+            return {
+                'goto': self.tool_handler_node,
+                'update': { 
+                    "messages": [self.tool_message]
+                }
+            }
         
                 
 class BaseToolInterruptArgsConfirmationHandler(BaseToolInterruptHandler):
@@ -186,11 +212,14 @@ class BaseToolInterruptArgsConfirmationHandler(BaseToolInterruptHandler):
         provided_args = self._generate_provided_args(response)
         
         if provided_args is None:
-            remove_tool_message = utils.remove_tool_messages(self.tool_message)
-            system_message = SystemMessage(content="User choose to exit the tool process.")
+            remove_tool_message = RemoveMessage(self.tool_message.id)
+            system_message = SystemMessage(content=f"User choose to exit the tool process with this response: {response}")            
             return {
                 'goto': END,
-                'update': { "messages": [remove_tool_message, system_message] }
+                'update': { 
+                    "messages": [remove_tool_message, system_message],
+                    "node_params": { N.CHATBOT_UPDATE_MESSAGES: { "update_messages": [remove_tool_message, system_message] } }
+                }
             }
         
         else:
@@ -287,15 +316,18 @@ class BaseToolInterruptOutputConfirmationHandler(BaseToolInterruptHandler):
             self.tool.output_confirmed = False
             return {
                 'goto': self.tool_handler_node,
-                'update': { "messages": [self.tool_message] }
+                'update': { "messages": [self.tool_message] } 
             }
     
         else:
-            remove_tool_message = utils.remove_tool_messages(self.tool_message)
-            system_message = SystemMessage(content="User choose to exit the tool process.")
+            remove_tool_message = RemoveMessage(self.tool_message.id)
+            system_message = SystemMessage(content=f"User choose to exit the tool process with this response: {response}")            
             return {
                 'goto': END,
-                'update': { "messages": [remove_tool_message, system_message]}
+                'update': { 
+                    "messages": [remove_tool_message, system_message],
+                    "node_params": { N.CHATBOT_UPDATE_MESSAGES: { "update_messages": [remove_tool_message, system_message] } }
+                }
             }
 
 
@@ -347,7 +379,7 @@ class BaseToolInterruptNode:
         
         # DOC: This is a template function that will be used to create the tool interrupt node function.
         def tool_interrupt_node_template(state):            
-            interrupt_data = state['nodes_params'][self.tool_interrupt_node_name]
+            interrupt_data = state['node_params'][self.tool_interrupt_node_name]
             tool_interrupt = interrupt_data['tool_interrupt']
             tool_name = interrupt_data['tool_interrupt']['tool']
             

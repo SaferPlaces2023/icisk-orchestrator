@@ -15,7 +15,7 @@ from webapp import utils
 from webapp import langgraph_interface as lgi
 from webapp.session.state import session_manager, Interrupt
 
-from db import DBI
+from db import DBI, DBS
 
 
 
@@ -157,14 +157,14 @@ with st.sidebar:
                     if st.button("👁️", key=f"view_{filename}-{ifn}", help="view file"):
                         utils.dialog_notebook_code(
                             dialog_title = filename,
-                            notebook_code = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source,
+                            notebook_code = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source_code,
                         )
                         
                 with col_download:
                     if session_manager.gui.is_requested_download(filename):
                         st.download_button(
                             label = "📥",
-                            data = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source,
+                            data = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source_code,
                             file_name = filename,
                             mime = "json/ipynb",
                             key = f"download_{filename}-{ifn}"
@@ -185,11 +185,18 @@ with st.sidebar:
             if st.button("Upload", help="upload file"):
                 if file_uploader is not None:
                     DBI.save_notebook(
-                        notebook_id = None,
-                        notebook_name = file_uploader.name,
-                        notebook_source = nbf.reads(StringIO(file_uploader.getvalue().decode("utf-8")).read(), as_version=4),
-                        authors = session_manager.user_id,
-                        notebook_description = None
+                        DBS.Notebook(
+                            _id = None,
+                            name = file_uploader.name,
+                            source = nbf.reads(StringIO(file_uploader.getvalue().decode("utf-8")).read(), as_version=4),
+                            authors = session_manager.user_id,
+                            description = None
+                        )
+                        # notebook_id = None,
+                        # notebook_name = file_uploader.name,
+                        # notebook_source = nbf.reads(StringIO(file_uploader.getvalue().decode("utf-8")).read(), as_version=4),
+                        # authors = session_manager.user_id,
+                        # notebook_description = None
                     )
                 st.rerun()
 
