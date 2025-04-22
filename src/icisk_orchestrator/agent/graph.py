@@ -29,7 +29,7 @@ graph_builder = StateGraph(BaseGraphState)
 graph_builder.add_node(chatbot)
 graph_builder.add_node(N.CHATBOT_UPDATE_MESSAGES, chatbot_update_messages)
 
-graph_builder.add_node(N.CDS_FORECAST_SUBGRAPH, cds_ingestor_subgraph)
+graph_builder.add_node(N.CDS_INGESTOR_SUBGRAPH, cds_ingestor_subgraph)
 
 graph_builder.add_node(N.SPI_CALCULATION_SUBGRAPH, spi_calculation_subgraph)
 
@@ -42,7 +42,7 @@ graph_builder.add_edge(START, N.CHATBOT)
 graph_builder.add_edge(N.CHATBOT_UPDATE_MESSAGES, N.CHATBOT)
 
 
-graph_builder.add_edge(N.CDS_FORECAST_SUBGRAPH, N.CHATBOT)
+graph_builder.add_edge(N.CDS_INGESTOR_SUBGRAPH, N.CHATBOT)
 
 graph_builder.add_edge(N.SPI_CALCULATION_SUBGRAPH, N.CHATBOT)
 

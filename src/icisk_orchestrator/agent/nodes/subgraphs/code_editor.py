@@ -26,17 +26,11 @@ code_editor_tools = list(code_editor_tools_dict.values())
 
 llm_with_code_editor_tools = utils._base_llm.bind_tools(code_editor_tools)
 
-
-
-# DOC: This is for store some information that could be util for the nodes in the subgraph. N.B. Keys are node names, values are a custom dict
-class CodeEditorState(BaseGraphState):
-    node_params: dict
-    
     
 
 # DOC: Base tool handler: runs the tool, if tool interrupt go to interrupt node handler
 code_editor_tool_handler = BaseToolHandlerNode(
-    state = CodeEditorState,
+    state = BaseGraphState,
     tool_handler_node_name = N.CODE_EDITOR_TOOL_HANDLER,
     tool_interrupt_node_name = N.CODE_EDITOR_TOOL_INTERRUPT,
     tools = code_editor_tools_dict,
@@ -71,7 +65,7 @@ class CodeEditorToolInterruptOutputConfirmationHandler(BaseToolInterruptOutputCo
       
 # DOC: Base tool interrupt node: handle tool interrupt by type and go back to tool hndler with updatet state to rerun tool
 code_editor_tool_interrupt = BaseToolInterruptNode(
-    state = CodeEditorState,
+    state = BaseGraphState,
     tool_handler_node_name = N.CODE_EDITOR_TOOL_HANDLER,
     tool_interrupt_node_name = N.CODE_EDITOR_TOOL_INTERRUPT,
     tools = code_editor_tools_dict,
@@ -83,7 +77,7 @@ code_editor_tool_interrupt = BaseToolInterruptNode(
 
 
 # DOC: State
-code_editor_graph_builder = StateGraph(CodeEditorState)
+code_editor_graph_builder = StateGraph(BaseGraphState)
 
 # DOC: Nodes
 code_editor_graph_builder.add_node(N.CODE_EDITOR_TOOL_HANDLER, code_editor_tool_handler)

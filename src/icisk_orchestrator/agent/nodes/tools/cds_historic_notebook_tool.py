@@ -21,6 +21,45 @@ from db import DBI, DBS
 # DOC: This is a tool that exploits I-Cisk API to ingests historic data from the Climate Data Store (CDS) API and saves it in a zarr format. It build a jupyter notebook to do that.
 class CDSHistoricNotebookTool(BaseAgentTool):
     
+    class InputHistoricVariable(str, Enum):
+    
+        total_precipitation = "total_precipitation"
+        temperature = "temperature"
+        
+        @property
+        def as_cds(self) -> str:
+            return {
+                'total_precipitation': 'total_precipitation',
+                'temperature': '2m_temperature',
+            }.get(self.value)
+            
+        @property
+        def as_icisk(self) -> str:
+            return {
+                'total_precipitation': 'tp',
+                'temperature': 't2m',
+            }.get(self.value)
+            
+        @property
+        def as_str(self) -> str:
+            return self.value
+            
+        @classmethod
+        def from_str(cls, alias, raise_error=False):
+            if alias in cls.__members__:
+                return cls[alias]
+            if 'prec' in alias:
+                return cls.total_precipitation
+            if 'min' in alias and 'temp' in alias:
+                return cls.min_temperature
+            if 'max' in alias and 'temp' in alias:
+                return cls.max_temperature
+            if 'temp' in alias:
+                return cls.temperature
+            if raise_error:
+                raise ValueError(f"{alias} is not a valid {cls.__name__} member")
+            return None
+    
     class InputSchema(BaseModel):
         
         historic_variables: None | list[str] = Field(
@@ -29,10 +68,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
             examples = [
                 None,
                 ['total_precipitation'],
-                ['temperature'],
-                ['glofas']
-                # ['min_temperature', 'max_temperature'],
-                # ['total_precipitation', 'glofas'],
+                ['temperature']
             ]
         )
         area: None | str | list[float] = Field(
@@ -120,11 +156,10 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         
         return {
             'historic_variables' : [
-                # TODO: Adapt
-                # lambda **ka: f"Invalid forecast variables: {ka['historic_variables']}. By now only one variable is supported." 
-                #     if len(ka['historic_variables']) > 1 else None,
-                # lambda **ka: f"Invalid forecast variables: {[v for v in ka['historic_variables'] if self.InputForecastVariable.from_str(v) is None]}. It should be a list of valid CDS forecast variables: {[self.InputForecastVariable._member_names_]}."
-                #     if len([v for v in ka['historic_variables'] if self.InputForecastVariable.from_str(v) is None]) > 0 else None 
+                lambda **ka: f"Invalid historic variables: {ka['historic_variables']}. By now only one variable is supported." 
+                    if len(ka['historic_variables']) > 1 else None,
+                lambda **ka: f"Invalid historic variables: {[v for v in ka['historic_variables'] if self.InputHistoricVariable.from_str(v) is None]}. It should be a list of valid CDS historic variables: {[self.InputHistoricVariable._member_names_]}."
+                    if len([v for v in ka['historic_variables'] if self.InputHistoricVariable.from_str(v) is None]) > 0 else None 
             ],
             'area': [
                 lambda **ka: f"Invalid area coordinates: {ka['area']}. It should be a list of 4 float values representing the bounding box [min_x, min_y, max_x, max_y]." 
@@ -158,11 +193,10 @@ class CDSHistoricNotebookTool(BaseAgentTool):
     # DOC: Inference rules ( i.e.: from location name to bbox ... )
     def _set_args_inference_rules(self) -> dict:
         
-        # TODO: Adapt
-        # def infer_historic_variables(**ka):
-        #     def alias_to_enum(forecast_variables):
-        #         return [self.InputForecastVariable.from_str(fc_var, raise_error=True) for fc_var in forecast_variables]
-        #     return alias_to_enum(ka['historic_variables'])
+        def infer_historic_variables(**ka):
+            def alias_to_enum(historic_variables):
+                return [self.InputHistoricVariable.from_str(hc_var, raise_error=True) for hc_var in historic_variables]
+            return alias_to_enum(ka['historic_variables'])
         
         def infer_area(**ka):
             def bounding_box_from_location_name(area):
@@ -198,7 +232,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
             return ka['jupyter_notebook']
         
         return {
-            # 'forecast_variables': infer_historic_variables, # TODO: See above
+            'historic_variables': infer_historic_variables,
             'area': infer_area,
             'start_time': infer_start_time,
             'end_time': infer_end_time,
@@ -231,14 +265,14 @@ class CDSHistoricNotebookTool(BaseAgentTool):
     ): 
         self.prepare_notebook(jupyter_notebook)    
         nb_values = {
-            # 'forecast_variables': [self.InputForecastVariable(var).as_cds for var in historic_variables], # TODO: Adapt
+            'historic_variables': [self.InputHistoricVariable(var).as_cds for var in historic_variables],
             'area': area,
             'start_time': start_time,
             'end_time': end_time,
             'zarr_output': zarr_output,
             
-            # 'cds_varname': self.InputForecastVariable(historic_variables[0]).as_cds, # TODO: Adapt (see above)
-            # 'icisk_varname': self.InputForecastVariable(historic_variables[0]).as_icisk, # TODO: Adapt (see above)
+            'cds_varname': self.InputHistoricVariable(historic_variables[0]).as_cds,
+            'icisk_varname': self.InputHistoricVariable(historic_variables[0]).as_icisk
         }
         for cell in self.notebook.source.cells:
             if cell.cell_type in ("markdown", "code"):

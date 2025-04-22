@@ -13,7 +13,8 @@ from agent.common.states import BaseGraphState
 from agent.nodes.tools import (
     CDSHistoricNotebookTool,
     CDSForecastNotebookTool,
-    SPICalculationNotebookTool,
+    SPIHistoricNotebookTool,
+    SPIForecastNotebookTool,
     CodeEditorTool
 )
 
@@ -21,13 +22,15 @@ from agent.nodes.tools import (
 
 cds_historic_notebook_tool = CDSHistoricNotebookTool()
 cds_forecast_notebook_tool = CDSForecastNotebookTool()
-spi_calculation_notebook_tool = SPICalculationNotebookTool()
+spi_historic_notebook_tool = SPIHistoricNotebookTool()
+spi_forecast_notebook_tool = SPIForecastNotebookTool()
 base_code_editor_tool = CodeEditorTool()
 
 tools_map = {
     cds_historic_notebook_tool.name : cds_historic_notebook_tool,
     cds_forecast_notebook_tool.name : cds_forecast_notebook_tool,
-    spi_calculation_notebook_tool.name : spi_calculation_notebook_tool,
+    spi_historic_notebook_tool.name : spi_historic_notebook_tool,
+    spi_forecast_notebook_tool.name : spi_forecast_notebook_tool,
     base_code_editor_tool.name : base_code_editor_tool
 }
 
@@ -43,7 +46,7 @@ def chatbot_update_messages(state: BaseGraphState):
     return {'messages': messages, 'node_params': dict()}
 
 
-def chatbot(state: BaseGraphState) -> Command[Literal[END, N.CHATBOT_UPDATE_MESSAGES, N.CDS_FORECAST_SUBGRAPH, N.SPI_CALCULATION_SUBGRAPH, N.CODE_EDITOR_SUBGRAPH]]:     # type: ignore
+def chatbot(state: BaseGraphState) -> Command[Literal[END, N.CHATBOT_UPDATE_MESSAGES, N.CDS_INGESTOR_SUBGRAPH, N.SPI_CALCULATION_SUBGRAPH, N.CODE_EDITOR_SUBGRAPH]]:     # type: ignore
     state["messages"] = state.get("messages", [])
     
     if len(state["messages"]) > 0:
@@ -59,10 +62,11 @@ def chatbot(state: BaseGraphState) -> Command[Literal[END, N.CHATBOT_UPDATE_MESS
             tool_call = ai_message.tool_calls[0]
             ai_message.tool_calls = [tool_call] 
             
-            if tool_call['name'] == cds_forecast_notebook_tool.name or \
-                tool_call['name'] == cds_historic_notebook_tool.name:
-                return Command(goto = N.CDS_FORECAST_SUBGRAPH, update = { "messages": [ ai_message ], "node_history": [N.CHATBOT, N.CDS_FORECAST_SUBGRAPH] })
-            elif tool_call['name'] == spi_calculation_notebook_tool.name:
+            if tool_call['name'] == cds_historic_notebook_tool.name or \
+                tool_call['name'] == cds_forecast_notebook_tool.name:
+                return Command(goto = N.CDS_INGESTOR_SUBGRAPH, update = { "messages": [ ai_message ], "node_history": [N.CHATBOT, N.CDS_INGESTOR_SUBGRAPH] })
+            elif tool_call['name'] == spi_historic_notebook_tool.name or \
+                tool_call['name'] == spi_forecast_notebook_tool.name:
                 return Command(goto = N.SPI_CALCULATION_SUBGRAPH, update = { "messages": [ ai_message ], "node_history": [N.CHATBOT, N.SPI_CALCULATION_SUBGRAPH] })
             elif tool_call['name'] == base_code_editor_tool.name:
                 return Command(goto = N.CODE_EDITOR_SUBGRAPH, update = { "messages": [ ai_message ], "node_history": [N.CHATBOT, N.CODE_EDITOR_SUBGRAPH] })
