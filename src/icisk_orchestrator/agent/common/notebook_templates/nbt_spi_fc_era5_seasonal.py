@@ -3,6 +3,8 @@ import datetime
 
 import nbformat as nbf
 
+from .nbt_utils import CellMetadata
+
 notebook_template = nbf.v4.new_notebook()
 notebook_template.cells.extend([
     nbf.v4.new_code_cell("""
@@ -25,7 +27,7 @@ notebook_template.cells.extend([
         !pip install "cdsapi>=0.7.4"
         import cdsapi
     """, 
-    metadata={"check_import": True}),
+    metadata={ CellMetadata.CHECK_IMPORT: True }),
     
     nbf.v4.new_code_cell("""
         # Section "Parameters"
@@ -42,10 +44,10 @@ notebook_template.cells.extend([
 
         cds_client = cdsapi.Client(url='https://cds.climate.copernicus.eu/api', key=getpass.getpass("YOUR CDS-API-KEY")) # CDS client
     """, 
-    metadata={"need_format": True}),
+    metadata={ CellMetadata.NEED_FORMAT: True }),
     
     nbf.v4.new_code_cell("""
-        filename = f'era5_land__total_precipitation__{{"_".join([str(c) for c in area])}}__monthly__{{reference_period[0]}}_{{reference_period[1]:02d}}.nc'
+        filename = f'era5_land__total_precipitation__{"_".join([str(c) for c in area])}__monthly__{reference_period[0]}_{reference_period[1]:02d}.nc'
 
         out_dir = 'tmpdir'
         os.makedirs(out_dir, exist_ok=True)
@@ -54,11 +56,11 @@ notebook_template.cells.extend([
 
         if not os.path.exists(cds_out_filename):
             cds_dataset = 'reanalysis-era5-land-monthly-means'
-            cds_query =  {{
+            cds_query =  {
                 'product_type': 'monthly_averaged_reanalysis',
                 'variable': 'total_precipitation',
                 'year': [str(year) for year in range(*reference_period)],
-                'month': [f'{{month:02d}}' for month in range(1, 13)],
+                'month': [f'{month:02d}' for month in range(1, 13)],
                 'time': '00:00',
                 'area': [
                     area[3],  # N
@@ -68,13 +70,13 @@ notebook_template.cells.extend([
                 ],
                 "data_format": "netcdf",
                 "download_format": "unarchived"
-            }}
+            }
 
             cds_client.retrieve(cds_dataset, cds_query, cds_out_filename)
 
         cds_ref_data = xr.open_dataset(cds_out_filename)
     """,
-    metadata={"check_existence": True}),
+    metadata={ CellMetadata.CHECK_EXISTENCE: True }),
     
     nbf.v4.new_code_cell("""
         # Section "Retrieve period of interest data from CDS"
@@ -239,7 +241,10 @@ notebook_template.cells.extend([
             spi_t_indexes = pd.DataFrame(zip(Hxs, txs), columns=['H','t']).apply(lambda x: Z(x.H, x.t), axis=1).to_list()
 
             return np.array(spi_t_indexes[-nt_return]) if nt_return==1 else np.array(spi_t_indexes[-nt_return:])
-
+    """,
+    metadata={ CellMetadata.CHECK_EXISTENCE: True }),
+    
+    nbf.v4.new_code_cell("""
         # Compute SPI over each cell
         month_spi_coverages = []
         for month in cds_poi_data.time:
@@ -258,17 +263,18 @@ notebook_template.cells.extend([
         spi_times = [msc[0] for msc in month_spi_coverages]
         spi_grids = [msc[1] for msc in month_spi_coverages]
 
-        spi_dataset = xr.concat(spi_grids, dim='time').to_dataset()
-        spi_dataset = spi_dataset.assign_coords({{'time': spi_times}})
-        spi_dataset = spi_dataset.rename_vars({{'tp': 'spi_fc'}})
+        spi_forecast_dataset = xr.concat(spi_grids, dim='time').to_dataset()
+        spi_forecast_dataset = spi_forecast_dataset.assign_coords({{'time': spi_times}})
+        spi_forecast_dataset = spi_forecast_dataset.rename_vars({{'tp': 'spi_fc'}})
 
-        spi_dataset = spi_dataset.transpose('model', 'time', 'lat', 'lon')
+        spi_forecast_dataset = spi_forecast_dataset.transpose('model', 'time', 'lat', 'lon')
     """),
+    
     nbf.v4.new_code_cell("""
-       # Section "Describe dataset"
+       # Section "Describe spi_forecast_dataset"
 
         \"\"\"
-        Object "dataset" is a xarray.Dataset
+        Object "spi_forecast_dataset" is a xarray.Dataset
         It has four dimensions named:
         - 'model': list of model ids 
         - 'time': forecast timesteps
@@ -279,6 +285,6 @@ notebook_template.cells.extend([
 
         # Use this dataset variable to do next analysis or plots
 
-        display(spi_dataset)
+        display(spi_forecast_dataset)
     """)
 ])

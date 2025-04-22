@@ -1,6 +1,6 @@
 import os
 import datetime
-import dateutil.relativedelta
+from dateutil import relativedelta
 
 from enum import Enum
 
@@ -15,6 +15,7 @@ from langchain_core.callbacks import (
 
 from agent import utils
 from agent.common import names as N
+from agent.common.notebook_templates import nbt_utils
 from agent.common.notebook_templates.nbt_spi_hist_era5_hourly import notebook_template as nbt_spi_hist_era5_hourly
 from agent.nodes.base import BaseAgentTool
 
@@ -56,16 +57,27 @@ class SPIHistoricNotebookTool(BaseAgentTool):
             ],
             default = (1981, 2010)
         )
-        period_of_interest: None | tuple = Field(
-            title = "Period of Interest",
-            description = f"Tuple of two elements representing the start and end month in YYYY-MM format of the period of interest for which SPI has to be calculated. Default is previous passed month { tuple( [ (datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=2)).strftime('%Y-%m'), (datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m') ] ) }",
+        start_time: None | str = Field(
+            title = "Start Time",
+            description = f"The start datetime provided in UTC-0 YYYY-MM-DD. If not specified use {(datetime.datetime.now() - relativedelta.relativedelta(months=2)).strftime('%Y-%m-01')} as default.",
             examples = [
                 None,
-                ("2025-01", "2025-02"),
-                ("2024-12", "2025-01"),
-                ("2024-03", "2025-03"),
+                "2025-01-01",
+                "2025-02-01",
+                "2025-03-10",
             ],
-            default = tuple( [ (datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m') ] )
+            default = None
+        )
+        end_time: None | str = Field(
+            title = "End Time",
+            description = f"The end date provided in UTC-0 YYYY-MM-DD. If not specified use: {(datetime.datetime.now() - relativedelta.relativedelta(months=-1)).strftime('%Y-%m-01')} as default.",
+            examples = [
+                None,
+                "2025-02-01",
+                "2025-03-01",
+                "2025-04-10",
+            ],
+            default = None
         )
         jupyter_notebook: None | str = Field(
             title = "Jupyter Notebook",
@@ -110,17 +122,19 @@ class SPIHistoricNotebookTool(BaseAgentTool):
                 lambda **ka: f"Invalid reference_period: {ka['reference_period']}. It should be in the past, at least in the previous year."
                     if ka['reference_period'][1] > datetime.datetime.now().year else None
             ],
-            'period_of_interest': [
-                lambda **ka: f"Invalid period_of_interest: {ka['period_of_interest']}. It should be a tuple of two elements representing the start and end month in YYYY-MM format."
-                    if type(ka['period_of_interest']) not in (tuple, list) or len(ka['period_of_interest']) != 2 else None,
-                lambda **ka: f"Invalid start period_of_interest: {ka['period_of_interest'][0]}. It should be in the format YYYY-MM."
-                    if utils.try_default(lambda: datetime.datetime.strptime(ka['period_of_interest'][0], "%Y-%m"), None) is None else None,
-                lambda **ka: f"Invalid end period_of_interest: {ka['period_of_interest'][1]}. It should be in the format YYYY-MM."
-                    if utils.try_default(lambda: datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m"), None) is None else None,
-                lambda **ka: f"Invalid lead time: {ka['period_of_interest'][1]}. It should be greater than start period_of_interest {ka['period_of_interest'][0]}."
-                    if datetime.datetime.strptime(ka['period_of_interest'][0], "%Y-%m") >= datetime.datetime.strptime(ka['period_of_interest'][1], "%Y-%m") else None,
-                lambda **ka: f"Invalid period_of_interest: {ka['period_of_interest']}. It can arrive at least to previous month."
-                    if ka['period_of_interest'][1] >= (datetime.datetime.now().strftime("%Y-%m")) else None,
+            'start_time': [
+                lambda **ka: f"Invalid start time: {ka['start_time']}. It should be in the format YYYY-MM-DD."
+                    if ka['start_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['start_time'], "%Y-%m-%d"), None) is None else None,
+                lambda **ka: f"Invalid start time: {ka['start_time']}. It should be in the past, at least in the previous month."
+                    if ka['start_time'] is not None and datetime.datetime.strptime(ka['start_time'], '%Y-%m-%d') > datetime.datetime.now().replace(day=1) else None
+            ],
+            'end_time': [
+                lambda **ka: f"Invalid end time: {ka['end_time']}. It should be in the format YYYY-MM-DD."
+                    if ka['end_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['end_time'], "%Y-%m-%d"), None) is None else None,
+                lambda **ka: f"Invalid end time: {ka['end_time']}. It should be in the after the init time."
+                    if ka['start_time'] is not None and ka['end_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['end_time'], '%Y-%m-%d') < datetime.datetime.strptime(ka['start_time'], '%Y-%m-%d'), False) else None,
+                lambda **ka: f"Invalid end time: {ka['end_time']}. It should be at least in the previous month."
+                    if ka['end_time'] is not None and datetime.datetime.strptime(ka['end_time'], '%Y-%m-%d') > datetime.datetime.now().replace(day=1) else None
             ],
             'jupyter_notebook': [
                 lambda **ka: f"Invalid notebook path: {ka['jupyter_notebook']}. It should be a valid jupyter notebook file path."
@@ -145,6 +159,16 @@ class SPIHistoricNotebookTool(BaseAgentTool):
                 return area
             return bounding_box_from_location_name(ka['area'])
         
+        def infer_start_time(**ka):
+            if ka['start_time'] is None:
+                return (datetime.datetime.now().date() - relativedelta.relativedelta(month=2)).strftime('%Y-%m-01')
+            return ka['start_time']
+        
+        def infer_end_time(**ka):
+            if ka['end_time'] is None:
+                return (datetime.datetime.now().date() - relativedelta.relativedelta(month=1)).strftime('%Y-%m-01')
+            return ka['end_time']
+        
         def infer_jupyter_notebook(**ka):
             if ka['jupyter_notebook'] is None:
                 return f"icisk-ai_spi-historic-calculation_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
@@ -152,6 +176,8 @@ class SPIHistoricNotebookTool(BaseAgentTool):
         
         return {
             'area': infer_area,
+            'start_time': infer_start_time,
+            'end_time': infer_end_time,
             'jupyter_notebook': infer_jupyter_notebook
         }
         
@@ -174,32 +200,18 @@ class SPIHistoricNotebookTool(BaseAgentTool):
         self,
         area: str | list[float],
         reference_period: tuple = (1981, 2010),
-        period_of_interest: tuple = ((datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m')),
+        start_time: str = None,
+        end_time: str = None,
         jupyter_notebook: str = None,
     ): 
-        # TODO: move to utils
-        def necessary_imports(code: str | list[str], context_code: str | list[str] = None):
-            lines = code if type(code) is list else [code]
-            context_code = context_code if type(context_code) is list else [context_code] if context_code is not None else []
-            lines = [ l for l in lines if l.strip() not in context_code ]
-            return '\n'.join(lines)
-            
-        
         self.prepare_notebook(jupyter_notebook)    
         nb_values = {
             'area': area,
             'reference_period': reference_period,
-            'period_of_interest': period_of_interest,
+            'start_time': start_time,
+            'end_time': end_time
         }
-        for ic,cell in enumerate(self.notebook.source.cells):
-            if cell.cell_type in ("markdown", "code"):
-                cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
-                if cell.metadata.get("check_import", False):
-                    previous_import_code = '\n'.join([c.source for c in self.notebook.source.cells[:ic] if c.metadata.get("check_import", False)])
-                    cell.source = necessary_imports(cell.source, context_code=previous_import_code)
-        self.notebook.source.cells = [cell for cell in self.notebook.source.cells if cell.cell_type != "code" or cell.source.replace('\n', '').strip() != ""]
-            
-                
+        self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values)
         DBI.save_notebook(self.notebook)
         
         return {
@@ -212,7 +224,8 @@ class SPIHistoricNotebookTool(BaseAgentTool):
         self, 
         area: str | list[float],
         reference_period: tuple = (1981, 2010),
-        period_of_interest: tuple = ((datetime.datetime.now()-dateutil.relativedelta.relativedelta(months=1)).strftime('%Y-%m'), datetime.datetime.now().strftime('%Y-%m')),
+        start_time: str = None,
+        end_time: str = None,
         jupyter_notebook: str = None,
         run_manager: None | Optional[CallbackManagerForToolRun] = None
     ) -> dict:
@@ -221,7 +234,8 @@ class SPIHistoricNotebookTool(BaseAgentTool):
             tool_args = {
                 "area": area,
                 "reference_period": reference_period,
-                "period_of_interest": period_of_interest,
+                "start_time": start_time,
+                "end_time": end_time,
                 "jupyter_notebook": jupyter_notebook
             },
             run_manager=run_manager
