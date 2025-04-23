@@ -34,13 +34,14 @@ notebook_template.cells.extend([
         !pip install cartopy
         import cartopy.crs as ccrs
         import cartopy.feature as cfeature
-    """, metadata={ CellMetadata.CHECK_IMPORT: True }),
+    """, 
+    metadata={ CellMetadata.CHECK_IMPORT: True }),
     
     nbf.v4.new_code_cell("""
         # Section "Define constant"
         
         # CDS Dataset name
-        dataset_name = {historic_dataset}
+        dataset_name = {dataset_name}
 
         # Forcast variables
         forecast_variables = {forecast_variables}
@@ -56,26 +57,29 @@ notebook_template.cells.extend([
 
         # ingested data ouput zarr file
         zarr_output = '{zarr_output}'
-    """, metadata={ CellMetadata.NEED_FORMAT: True }),
+    """,
+    metadata={ CellMetadata.NEED_FORMAT: True }),
     
     nbf.v4.new_code_cell("""
-        # Section "Call I-Cisk cds-ingestor-process API" from reanalysis-era5-land-monthly-means dataset [ https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land-monthly-means?tab=overview ]
+        # Section "Call I-Cisk cds-ingestor-process API"
 
-        job_responses = { hist_var: { 'job_id': None, 'result': None } for hist_var in hist_variables }
+        job_responses = { fc_var: { 'job_id': None, 'result': None } for fc_var in forecast_variables }
 
-        for hist_var in hist_variables:
+        for fc_var in forecast_variables:
 
             # Prepare payload
             icisk_api_payload = {
                 "inputs": {
-                    "dataset": dataset_name,
-                    "file_out": f"/tmp/{zarr_output.replace('.zarr', f'-{hist_var}')}.nc",
+                    "dataset": "seasonal-original-single-levels",
+                    "file_out": f"/tmp/{zarr_output.replace('.zarr', f'-{fc_var}')}.nc",
                     "query": {
-                        "product_type": ["monthly_averaged_reanalysis"],
-                        "variable": [hist_var],
-                        "year": [str(year) for year in range(start_time.year, end_time.year+1)],
-                        "month": pd.date_range(start=start_time, end=end_time, freq='MS').strftime('%m').unique().to_list(),
-                        "time": ["00:00"],
+                        "originating_centre": "ecmwf",
+                        "system": "51",
+                        "variable": [fc_var],
+                        "year": [f"{init_time.year}"],
+                        "month": [f"{init_time.month:02d}"],
+                        "day": ["01"],
+                        "leadtime_hour": [str(h) for h in range(24, int((lead_time - init_time).total_seconds() // 3600), 24)],
                         "area": [
                             region[3],
                             region[0],
@@ -83,7 +87,6 @@ notebook_template.cells.extend([
                             region[2]
                         ],
                         "data_format": "netcdf",
-                        "download_format": "unarchived"
                     },
                     "token": "YOUR-ICISK-API-TOKEN",
                     "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_output.replace('.zarr', f'-{fc_var}')}.zarr",
@@ -111,7 +114,7 @@ notebook_template.cells.extend([
 
             # Get job id
             job_id = icisk_api_response.headers['Location'].split("/")[-1]
-            job_responses[hist_var]['job_id'] = job_id
+            job_responses[fc_var]['job_id'] = job_id
 
             # Display response
             print('• Response')
@@ -122,18 +125,93 @@ notebook_template.cells.extend([
 
             print(); print('###################################################################'); print();
     """,
-    metadata = { CellMetadata.MODE: 'reanalysis-era5-land-monthly-means' }),    # TODO: write the hourly cds case
+    metadata={ CellMetadata.MODE: 'seasonal-original-single-levels' }),
     
     nbf.v4.new_code_cell("""
+        # Section "Call I-Cisk cds-ingestor-process API"
+
+        job_responses = { fc_var: { 'job_id': None, 'result': None } for fc_var in forecast_variables }
+
+        for fc_var in forecast_variables:
+
+            # Prepare payload
+            icisk_api_payload = {
+                "inputs": {
+                    "dataset": dataset_name,
+                    "service": "EWDS",
+                    "file_out": f"/tmp/{zarr_out.replace('.zarr', '')}.nc",
+                    "query": {
+                        "system_version": ["operational"],
+                        "hydrological_model": [
+                            "lisflood",
+                            "htessel_lisflood"
+                        ],
+                        "variable": [
+                            "river_discharge_in_the_last_24_hours"
+                        ],
+                        "year": [f'{init_time.year}'],
+                        "month": [f'{init_time.month:02d}'],
+                        "leadtime_hour": [str(h) for h in range(24, int((lead_time - init_time).total_seconds() // 3600), 24)],
+                        "area": [
+                            region[3],
+                            region[0],
+                            region[1],
+                            region[2]
+                        ],
+                        "data_format": "netcdf",
+                        "download_format": "unarchived"
+                    },
+                    "token": "YOUR-ICISK-API-TOKEN",
+                    "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_out}",
+                }
+            }
+
+            print(); print('###################################################################'); print();
+
+            print('• Payload')
+            pprint.pprint(icisk_api_payload)
+
+            print(); print('-------------------------------------------------------------------'); print();
+
+            icisk_api_token = 'token' # getpass.getpass("YOUR ICISK-API-TOKEN: ")
+
+            icisk_api_payload['inputs']['token'] = icisk_api_token
+
+            # Call API
+            root_url = 'https://i-cisk.dev.52north.org/ingest'
+            icisk_api_response = requests.post(
+                url = f'{root_url}/processes/ingestor-cds-process/execution',
+                headers = { 'Prefer': 'respond-async' },
+                json = icisk_api_payload
+            )
+
+            # Get job id
+            job_id = icisk_api_response.headers['Location'].split("/")[-1]
+            job_responses[fc_var]['job_id'] = job_id
+
+            # Display response
+            print('• Response')
+            pprint.pprint({
+                'job_id': job_id,
+                'status_code': icisk_api_response.status_code,
+            })
+
+            print(); print('###################################################################'); print();
+    """,
+    metadata={ CellMetadata.MODE: 'cems-glofas-seasonal' }),
+    
+    nbf.v4.new_code_cell("""
+        # Section "Check job status"
+                         
         timesleep = 30
 
-        while any([job_response['result']==None for job_response in job_responses.values()]):
+        while any([job_response['result'] == None for job_response in job_responses.values()]):
             for fc_var,job_response in job_responses.items():
                 if job_response['result'] is None:
                     job_status = requests.get(f'{root_url}/jobs/{job_response["job_id"]}?f=json').json()['status']
                     if job_status in ["failed", "successful", "dismissed"]:
-                        job_response['result'] = requests.get(f'{root_url}/jobs/{job_response["job_id"]}/results?f=json').json()
-                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} is {job_status}')
+                        job_response['result'] = requests.get(f'{root_url}/jobs/{job_id}/results?f=json').json()
+                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} completed')
                     else:
                         print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} status is "{job_status}" - retring in {timesleep} seconds')
             if any([job_response['result']==None for job_response in job_responses.values()]):
@@ -145,10 +223,10 @@ notebook_template.cells.extend([
 
         dataset_list = []
 
-        for var in {historic_variables_icisk}:
+        for fc_var in {forecast_variables_icisk}:
 
             living_lab = None
-            collection_name = f"{{dataset_name}}_{{start_time.strftime('%Y%m')}}_{{living_lab}}_{{var}}"
+            collection_name = f"seasonal-original-single-levels_{{init_time.strftime('%Y%m')}}_{{living_lab}}_{{fc_var}}_0"
 
             # Query collection
             collection_response = requests.get(
@@ -161,7 +239,7 @@ notebook_template.cells.extend([
 
             # Get response
             if collection_response.status_code == 200:
-                collection_data = json.loads(collection_response.content)
+                collection_data = collection_response.json()
             else:
                 print(f'Error {{collection_response.status_code}}: {{collection_response.json()}}')
 
@@ -171,13 +249,14 @@ notebook_template.cells.extend([
             ranges = collection_data['ranges']
 
             dims = {{
-                'time': pd.date_range(axes['valid_time']['start'], axes['valid_time']['stop'], axes['valid_time']['num']),
+                'model': list(map(int, [p.split('_')[1] for p in params])),
+                'time': pd.date_range(axes['time']['start'], axes['time']['stop'], axes['time']['num']),
                 'lon': np.linspace(axes['x']['start'], axes['x']['stop'], axes['x']['num'], endpoint=True),
                 'lat': np.linspace(axes['y']['start'], axes['y']['stop'], axes['y']['num'], endpoint=True)
             }}
-            vars = {
-                var: (tuple(dims.keys()), np.array(ranges[var]['values']).reshape((len(dims['time']), len(dims['lon']), len(dims['lat'])))) 
-            }
+            vars = {{
+                fc_var: (tuple(dims.keys()), np.stack([ np.array(ranges[name]['values']).reshape((len(dims['time']), len(dims['lon']), len(dims['lat']))) for name in params ]) )
+            }}
 
             # Build xarray dataset
             dataset = xr.Dataset(
@@ -186,9 +265,9 @@ notebook_template.cells.extend([
             )
             dataset_list.append(dataset)
 
-        dataset = xr.merge(dataset_list).sortby(['time', 'lat', 'lon'])
+        dataset = xr.merge(dataset_list).sortby(['model', 'time', 'lat', 'lon'])
     """,
-    metadata = { CellMetadata.NEED_FORMAT: True }),
+    metadata={ CellMetadata.NEED_FORMAT: True }),
     
     nbf.v4.new_code_cell("""
         # Section "Describe dataset"
@@ -196,10 +275,11 @@ notebook_template.cells.extend([
         \"\"\"
         Object "dataset" is a xarray.Dataset
         It has four dimensions named:
-        - 'time': historic timesteps
+        - 'model': list of model ids 
         - 'lat': list of latitudes, 
         - 'lon': list of longitudes,
-        It has these variables: {historic_variables_icisk} representing the {historic_variables} historic data values. Variables have a shape of [time, lat, lon].
+        - 'time': forecast timesteps
+        It has these variables: {forecast_variables_icisk} representing the {forecast_variables} forecast data values. Variables have a shape of [model, time, lat, lon].
         \"\"\"
 
         # Use this dataset variable to do next analysis or plots
@@ -207,7 +287,4 @@ notebook_template.cells.extend([
         display(dataset)
     """, 
     metadata={ CellMetadata.NEED_FORMAT: True })
-    
-    
-    
 ])

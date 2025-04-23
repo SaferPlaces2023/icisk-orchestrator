@@ -16,7 +16,7 @@ from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
 from agent.common.notebook_templates import nbt_utils
-from agent.common.notebook_templates.nbt_cds_hist_era5_hourly import notebook_template as nbt_cds_hist_era5_hourly
+from icisk_orchestrator.agent.common.notebook_templates.nbt_cds_historic import notebook_template as nbt_cds_hist_era5_hourly
 from db import DBI, DBS
 
 # DOC: This is a tool that exploits I-Cisk API to ingests historic data from the Climate Data Store (CDS) API and saves it in a zarr format. It build a jupyter notebook to do that.
@@ -318,7 +318,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
             
             'historic_variables_icisk': [self.InputHistoricVariable(var).as_icisk for var in historic_variables],
         }
-        self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values)   
+        self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values, mode=nb_values['historic_dataset'])   # DOC: We write different code section based on dataset  
         DBI.save_notebook(self.notebook)
         
         return {

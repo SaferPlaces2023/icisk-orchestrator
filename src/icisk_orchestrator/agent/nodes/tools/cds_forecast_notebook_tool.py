@@ -16,7 +16,7 @@ from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
 from agent.common.notebook_templates import nbt_utils
-from agent.common.notebook_templates.nbt_cds_fc_era5_seasonal import notebook_template as nbt_cds_fc_era5_seasonal
+from icisk_orchestrator.agent.common.notebook_templates.nbt_cds_forecast import notebook_template as nbt_cds_fc_era5_seasonal
 from db import DBI, DBS
 
 
@@ -194,7 +194,13 @@ class CDSForecastNotebookTool(BaseAgentTool):
                 lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be in the after the init time."
                     if ka['init_time'] is not None and ka['lead_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') < datetime.datetime.strptime(ka['init_time'], '%Y-%m-%d'), False) else None,
                 lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be no more than 6 months in the future."
-                    if ka['lead_time'] is not None and datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') > (datetime.datetime.now().replace(day=1) + relativedelta.relativedelta(months=6)) else None
+                    if ka['lead_time'] is not None and \
+                        self.InputForecastVariable.glofas not in [self.InputForecastVariable.from_str(v) for v in ka['forecast_variables']] and \
+                        datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') > (datetime.datetime.now().replace(day=1) + relativedelta.relativedelta(months=6)) else None,
+                lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be no more than 1 months in the future for the glofas data."
+                    if ka['lead_time'] is not None and \
+                        self.InputForecastVariable.glofas in [self.InputForecastVariable.from_str(v) for v in ka['forecast_variables']] and \
+                        datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') > (datetime.datetime.now().replace(day=1) + relativedelta.relativedelta(months=1)) else None
             ],
             'zarr_output': [
                 lambda **ka: f"Invalid output path: {ka['zarr_output']}. It should be a valid zarr file path."
@@ -282,15 +288,16 @@ class CDSForecastNotebookTool(BaseAgentTool):
     ): 
         self.prepare_notebook(jupyter_notebook)    
         nb_values = {
+            'dataset_name': 'seasonal-original-single-levels' if self.InputForecastVariable.glofas not in [self.InputForecastVariable.from_str(v) for v in forecast_variables] else 'cems-glofas-seasonal',
             'forecast_variables': [self.InputForecastVariable(var).as_cds for var in forecast_variables],
             'area': area,
             'init_time': init_time,
             'lead_time': lead_time,
             'zarr_output': zarr_output,
             
-            'forecast_variables_icisk': [self.InputForecastVariable(var).as_icisk for var in forecast_variables],
+            'forecast_variables_icisk': [self.InputForecastVariable(var).as_icisk for var in forecast_variables]
         }
-        self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values)   
+        self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values, mode=nb_values['dataset_name'])   # DOC: We write different code section based on dataset
         DBI.save_notebook(self.notebook)
         
         return {
