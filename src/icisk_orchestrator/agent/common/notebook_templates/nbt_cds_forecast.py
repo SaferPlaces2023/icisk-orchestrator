@@ -265,7 +265,7 @@ notebook_template.cells.extend([
             )
             dataset_list.append(dataset)
 
-        dataset = xr.merge(dataset_list).sortby(['model', 'time', 'lat', 'lon'])
+        dataset_cds_forecast = xr.merge(dataset_list).sortby(['model', 'time', 'lat', 'lon'])
     """,
     metadata={ CellMetadata.NEED_FORMAT: True }),
     
@@ -273,7 +273,7 @@ notebook_template.cells.extend([
         # Section "Describe dataset"
 
         \"\"\"
-        Object "dataset" is a xarray.Dataset
+        Object "dataset_cds_forecast" is a xarray.Dataset
         It has four dimensions named:
         - 'model': list of model ids 
         - 'lat': list of latitudes, 
@@ -282,9 +282,9 @@ notebook_template.cells.extend([
         It has these variables: {forecast_variables_icisk} representing the {forecast_variables} forecast data values. Variables have a shape of [model, time, lat, lon].
         \"\"\"
 
-        # Use this dataset variable to do next analysis or plots
+        # Use the dataset_cds_forecast variable to do next analysis or plots
 
-        display(dataset)
+        display(dataset_cds_forecast)
     """, 
     metadata={ CellMetadata.NEED_FORMAT: True })
 ])

@@ -95,6 +95,10 @@ def ask_llm(role, message, llm=_base_llm, eval_output=False):
     if eval_output:
         try: 
             content = llm_out.content
+            print('\n\n')
+            print(type(content))
+            print(content)
+            print('\n\n')
             if type(content) is str and content.startswith('```python'):
                 content = content.split('```python')[1].split('```')[0]
             return ast.literal_eval(content)

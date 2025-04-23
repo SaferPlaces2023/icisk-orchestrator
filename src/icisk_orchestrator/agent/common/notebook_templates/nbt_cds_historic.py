@@ -43,16 +43,16 @@ notebook_template.cells.extend([
         dataset_name = {historic_dataset}
 
         # Forcast variables
-        forecast_variables = {forecast_variables}
+        historic_variables = {historic_variables}
         
         # Bouning box of interest in format [min_lon, min_lat, max_lon, max_lat]
         region = {area}
 
         # init forecast datetime
-        init_time = datetime.datetime.strptime('{init_time}', "%Y-%m-%d").replace(day=1)
+        start_time = datetime.datetime.strptime('{start_time}', "%Y-%m-%d").replace(day=1)
 
         # lead forecast datetime
-        lead_time = datetime.datetime.strptime('{lead_time}', "%Y-%m-%d").replace(day=1)
+        end_time = datetime.datetime.strptime('{end_time}', "%Y-%m-%d").replace(day=1)
 
         # ingested data ouput zarr file
         zarr_output = '{zarr_output}'
@@ -61,9 +61,9 @@ notebook_template.cells.extend([
     nbf.v4.new_code_cell("""
         # Section "Call I-Cisk cds-ingestor-process API" from reanalysis-era5-land-monthly-means dataset [ https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land-monthly-means?tab=overview ]
 
-        job_responses = { hist_var: { 'job_id': None, 'result': None } for hist_var in hist_variables }
+        job_responses = { hist_var: { 'job_id': None, 'result': None } for hist_var in historic_variables }
 
-        for hist_var in hist_variables:
+        for hist_var in historic_variables:
 
             # Prepare payload
             icisk_api_payload = {
@@ -131,7 +131,7 @@ notebook_template.cells.extend([
 
         for year_month in pd.date_range(start=start_time, end=end_time, freq='MS').to_list():
             
-            for hist_var in hist_variables:
+            for hist_var in historic_variables:
 
                 job_responses[f'{year_month.strftime("%Y%m")}-{hist_var}'] = { 'job_id': None, 'result': None }
 
@@ -247,9 +247,9 @@ notebook_template.cells.extend([
                 'lon': np.linspace(axes['x']['start'], axes['x']['stop'], axes['x']['num'], endpoint=True),
                 'lat': np.linspace(axes['y']['start'], axes['y']['stop'], axes['y']['num'], endpoint=True)
             }}
-            vars = {
+            vars = {{
                 var: (tuple(dims.keys()), np.array(ranges[var]['values']).reshape((len(dims['time']), len(dims['lon']), len(dims['lat'])))) 
-            }
+            }}
 
             # Build xarray dataset
             dataset = xr.Dataset(
@@ -258,15 +258,15 @@ notebook_template.cells.extend([
             )
             dataset_list.append(dataset)
 
-        dataset = xr.merge(dataset_list).sortby(['time', 'lat', 'lon'])
+        dataset_cds_historic = xr.merge(dataset_list).sortby(['time', 'lat', 'lon'])
     """,
     metadata = { CellMetadata.NEED_FORMAT: True }),
     
     nbf.v4.new_code_cell("""
-        # Section "Describe dataset"
+        # Section "Describe dataset_cds_historic"
 
         \"\"\"
-        Object "dataset" is a xarray.Dataset
+        Object "dataset_cds_historic" is a xarray.Dataset
         It has four dimensions named:
         - 'time': historic timesteps
         - 'lat': list of latitudes, 
@@ -274,9 +274,9 @@ notebook_template.cells.extend([
         It has these variables: {historic_variables_icisk} representing the {historic_variables} historic data values. Variables have a shape of [time, lat, lon].
         \"\"\"
 
-        # Use this dataset variable to do next analysis or plots
+        # Use the dataset_cds_historic variable to do next analysis or plots
 
-        display(dataset)
+        display(dataset_cds_historic)
     """, 
     metadata={ CellMetadata.NEED_FORMAT: True })
     

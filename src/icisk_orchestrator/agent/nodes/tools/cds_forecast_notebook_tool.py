@@ -16,7 +16,7 @@ from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
 from agent.common.notebook_templates import nbt_utils
-from icisk_orchestrator.agent.common.notebook_templates.nbt_cds_forecast import notebook_template as nbt_cds_fc_era5_seasonal
+from agent.common.notebook_templates.nbt_cds_forecast import notebook_template as nbt_cds_forecast
 from db import DBI, DBS
 
 
@@ -65,6 +65,8 @@ class CDSForecastNotebookTool(BaseAgentTool):
             if 'temp' in alias:
                 return cls.temperature
             if 'glofas' in alias:
+                return cls.glofas
+            if 'discharge' in alias:
                 return cls.glofas
             if raise_error:
                 raise ValueError(f"{alias} is not a valid {cls.__name__} member")
@@ -273,7 +275,7 @@ class CDSForecastNotebookTool(BaseAgentTool):
                 authors = self.graph_state.get('user_id'),
                 source = nbf.v4.new_notebook()
             )
-        self.notebook.source.cells.extend(nbt_cds_fc_era5_seasonal.cells)
+        self.notebook.source.cells.extend(nbt_cds_forecast.cells)
     
     
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file

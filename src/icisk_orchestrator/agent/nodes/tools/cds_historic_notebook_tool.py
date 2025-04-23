@@ -16,15 +16,15 @@ from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
 from agent.common.notebook_templates import nbt_utils
-from icisk_orchestrator.agent.common.notebook_templates.nbt_cds_historic import notebook_template as nbt_cds_hist_era5_hourly
+from agent.common.notebook_templates.nbt_cds_historic import notebook_template as nbt_cds_historic
 from db import DBI, DBS
 
 # DOC: This is a tool that exploits I-Cisk API to ingests historic data from the Climate Data Store (CDS) API and saves it in a zarr format. It build a jupyter notebook to do that.
 class CDSHistoricNotebookTool(BaseAgentTool):
     
     class InputHistoricCDSDataset(str, Enum):
-        reanalysis_era5_land_monthly_means = "reanalysis_era5_land_monthly_means"
-        reanalysis_era5_land = "reanalysis_era5_land"
+        reanalysis_era5_land_monthly_means = "reanalysis-era5-land-monthly-means"
+        reanalysis_era5_land = "reanalysis-era5-land"
         
         @property
         def as_str(self) -> str:
@@ -34,6 +34,8 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         def from_str(cls, alias, raise_error=False):
             if alias in cls.__members__:
                 return cls[alias]
+            if alias.replace('-', '_') in cls.__members__:
+                return cls[alias.replace('-', '_')]
             if 'month' in alias:
                 return cls.reanalysis_era5_land_monthly_means
             if 'hour' in alias:
@@ -193,8 +195,6 @@ class CDSHistoricNotebookTool(BaseAgentTool):
                     if self.InputHistoricCDSDataset.from_str(ka['historic_dataset']) is None else None   
             ],                
             'historic_variables' : [
-                lambda **ka: f"Invalid historic variables: {ka['historic_variables']}. By now only one variable is supported." 
-                    if len(ka['historic_variables']) > 1 else None,
                 lambda **ka: f"Invalid historic variables: {[v for v in ka['historic_variables'] if self.InputHistoricVariable.from_str(v) is None]}. It should be a list of valid CDS historic variables: {[self.InputHistoricVariable._member_names_]}."
                     if len([v for v in ka['historic_variables'] if self.InputHistoricVariable.from_str(v) is None]) > 0 else None 
             ],
@@ -293,7 +293,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
                 authors = self.graph_state.get('user_id'),
                 source = nbf.v4.new_notebook()
             )
-        self.notebook.source.cells.extend(nbt_cds_hist_era5_hourly.cells)
+        self.notebook.source.cells.extend(nbt_cds_historic.cells)
         
         
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file

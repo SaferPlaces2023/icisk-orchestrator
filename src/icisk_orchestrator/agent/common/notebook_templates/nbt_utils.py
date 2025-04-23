@@ -39,6 +39,8 @@ def write_notebook_template(notebook: nbf.NotebookNode, values_dict: dict = dict
     
     def compile_cell(cell):
         cell.source = safe_code_lines(cell.source, format_dict=values_dict if cell.metadata.get(CellMetadata.NEED_FORMAT, False) else None)
+        if cell.metadata.get(CellMetadata.NEED_FORMAT, False):
+            cell.metadata.pop(CellMetadata.NEED_FORMAT, None)
         if cell.metadata.get(CellMetadata.CHECK_IMPORT, False):
             previous_import_code = '\n'.join([c.source for c in notebook.cells[:ic] if c.metadata.get(CellMetadata.CHECK_IMPORT, False)])
             cell.source = necessary_imports(cell.source, context_code=previous_import_code)
