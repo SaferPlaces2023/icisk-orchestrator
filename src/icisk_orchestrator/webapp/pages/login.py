@@ -23,7 +23,6 @@ def validate_login(user_id: str):
         return False
 
 
-
 _, center_col, _ = st.columns([1, 1, 1], vertical_alignment="center") 
 
 with center_col:   
@@ -43,6 +42,5 @@ with center_col:
                 st.divider()
                 st.error("Invalid user ID. Please try again.")
                 st.stop()
-                
                 
 # TODO: Maybe some description, footer, credits, etc.

@@ -15,6 +15,7 @@ class GUI():
     def __init__(self):
         self.chat_input = dict()
         self.file_downloader = dict()
+        self.tool_choice: str = None
     
     @property 
     def filenames(self) -> list | None:
@@ -31,6 +32,12 @@ class GUI():
     @property
     def chat_register(self) -> dict | None:
         return DBI.chat_by_user_id(st.session_state.app.user_id, retrieve_messages=False)
+   
+    def update_tool_choice(self, value: str | None):
+        if value is None or value == 'All tools (default)':
+            self.tool_choice = None
+        else:
+            self.tool_choice = value
 
 
 class Interrupt():
@@ -101,9 +108,14 @@ class SessionManager():
             self.new_chat(title=messages[0].get('content', 'New Chat') if len(messages)>0 else 'New Chat')
         self.chat.add_messages(messages)
         DBI.update_chat(self.chat)
+    def close_chat(self):
+        if self.chat is not None:
+            DBI.update_chat(self.chat)
+            st.session_state.app.chat = None
+            st.session_state.app.chat_history = []
     
     @property
-    def gui(self):
+    def gui(self) -> GUI | None:
         return st.session_state.app.gui if hasattr(st.session_state, 'app') else None
     
     @property

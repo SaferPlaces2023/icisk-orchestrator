@@ -15,12 +15,33 @@ from langchain_core.callbacks import (
 from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
+from agent.common.notebook_templates import nbt_utils
 from agent.common.notebook_templates.nbt_cds_hist_era5_hourly import notebook_template as nbt_cds_hist_era5_hourly
 from db import DBI, DBS
 
 # DOC: This is a tool that exploits I-Cisk API to ingests historic data from the Climate Data Store (CDS) API and saves it in a zarr format. It build a jupyter notebook to do that.
 class CDSHistoricNotebookTool(BaseAgentTool):
     
+    class InputHistoricCDSDataset(str, Enum):
+        reanalysis_era5_land_monthly_means = "reanalysis_era5_land_monthly_means"
+        reanalysis_era5_land = "reanalysis_era5_land"
+        
+        @property
+        def as_str(self) -> str:
+            return self.value.replace('_', '-')
+        
+        @classmethod
+        def from_str(cls, alias, raise_error=False):
+            if alias in cls.__members__:
+                return cls[alias]
+            if 'month' in alias:
+                return cls.reanalysis_era5_land_monthly_means
+            if 'hour' in alias:
+                return cls.reanalysis_era5_land
+            if raise_error:
+                raise ValueError(f"{alias} is not a valid {cls.__name__} member")
+            return None
+        
     class InputHistoricVariable(str, Enum):
     
         total_precipitation = "total_precipitation"
@@ -62,6 +83,18 @@ class CDSHistoricNotebookTool(BaseAgentTool):
     
     class InputSchema(BaseModel):
         
+        historic_dataset: None | str = Field(
+            title = "Historic Dataset",
+            description = """The historic dataset to be used for the data retrieval. If not specified use None as default.
+            It could be one of the following: 
+            - 'reanalysis-era5-land-monthly-means': to get monthly means data from the Climate Data Store (CDS) API.
+            - 'reanalysis-era5-land': to get hourly data from the Climate Data Store (CDS) API.""",
+            examples=[
+                None,
+                "reanalysis-era5-land-monthly-means",
+                "reanalysis-era5-land",
+            ]
+        )
         historic_variables: None | list[str] = Field(
             title = "Historic Variables",
             description = "List of historic variables to be retrieved from the CDS API. If not specified use None as default.", 
@@ -155,6 +188,10 @@ class CDSHistoricNotebookTool(BaseAgentTool):
     def _set_args_validation_rules(self) -> dict:
         
         return {
+            'historic_dataset': [
+                lambda **ka: f"Invalid historic dataset: {ka['historic_dataset']}. It should be a list of valid CDS historic dataset: {[self.InputHistoricCDSDataset._member_names_]}."
+                    if self.InputHistoricCDSDataset.from_str(ka['historic_dataset']) is None else None   
+            ],                
             'historic_variables' : [
                 lambda **ka: f"Invalid historic variables: {ka['historic_variables']}. By now only one variable is supported." 
                     if len(ka['historic_variables']) > 1 else None,
@@ -192,6 +229,11 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         
     # DOC: Inference rules ( i.e.: from location name to bbox ... )
     def _set_args_inference_rules(self) -> dict:
+        
+        def infer_historic_dataset(**ka):
+            def alias_to_enum(historic_dataset):
+                return self.InputHistoricCDSDataset.from_str(historic_dataset, raise_error=True)
+            return alias_to_enum(ka['historic_dataset'])
         
         def infer_historic_variables(**ka):
             def alias_to_enum(historic_variables):
@@ -232,12 +274,13 @@ class CDSHistoricNotebookTool(BaseAgentTool):
             return ka['jupyter_notebook']
         
         return {
+            'historic_dataset': infer_historic_dataset,
             'historic_variables': infer_historic_variables,
             'area': infer_area,
             'start_time': infer_start_time,
             'end_time': infer_end_time,
             'zarr_output': infer_zarr_output,
-            'jupyter_notebook': infer_jupyter_notebook,
+            'jupyter_notebook': infer_jupyter_notebook
         }
        
         
@@ -256,6 +299,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file
     def _execute(
         self,
+        historic_dataset: str,
         historic_variables: list[str],
         area: str | list[float],
         start_time: str,
@@ -265,18 +309,16 @@ class CDSHistoricNotebookTool(BaseAgentTool):
     ): 
         self.prepare_notebook(jupyter_notebook)    
         nb_values = {
+            'historic_dataset': self.InputHistoricCDSDataset(historic_dataset).as_str,
             'historic_variables': [self.InputHistoricVariable(var).as_cds for var in historic_variables],
             'area': area,
             'start_time': start_time,
             'end_time': end_time,
             'zarr_output': zarr_output,
             
-            'cds_varname': self.InputHistoricVariable(historic_variables[0]).as_cds,
-            'icisk_varname': self.InputHistoricVariable(historic_variables[0]).as_icisk
+            'historic_variables_icisk': [self.InputHistoricVariable(var).as_icisk for var in historic_variables],
         }
-        for cell in self.notebook.source.cells:
-            if cell.cell_type in ("markdown", "code"):
-                cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
+        self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values)   
         DBI.save_notebook(self.notebook)
         
         return {
@@ -288,6 +330,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
     # DOC: Try running AgentTool → Will check required, validity and inference over arguments thatn call and return _execute()
     def _run(
         self, 
+        historic_dataset: str,
         historic_variables: list[str],
         area: str | list[float],
         start_time: str = None,
@@ -299,6 +342,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         
         return super()._run(
             tool_args = {
+                "historic_dataset": historic_dataset,
                 "historic_variables": historic_variables,
                 "area": area,
                 "start_time": start_time,

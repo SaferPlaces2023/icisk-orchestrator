@@ -27,13 +27,18 @@ async def ask_agent(
     message: str,
     
     interrupt_response_key: str = None,
+    tool_choice: str = None
 ):
     
     run_args = dict()
+    
     if interrupt_response_key is not None:
         run_args['command'] = Command(resume={interrupt_response_key: message})
     else:
         run_args['input'] = {"messages": [{"role": "human", "content": message}]}
+        # DOC: Tool choice pass thorough chatbot node, the send only when input
+        if tool_choice is not None: 
+            run_args['input']['node_params'] = {'chatbot': {'tool_choice': tool_choice}}
     
     async for chunk in client.runs.stream(
         thread_id,

@@ -1,7 +1,10 @@
 import os
 
 import nbformat as nbf
+from nbconvert import HTMLExporter
+
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 
@@ -19,14 +22,31 @@ def tool_args_md_table(args_dict):
     
 def dialog_notebook_code(dialog_title: str, notebook_code: str | nbf.NotebookNode):
     
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stDialog"] div[role="dialog"]:has(.big-dialog) {
+            width: 80vw;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    
     @st.dialog(dialog_title, width="large")
-    def show_ipynb_code(notebook_code: str):
-        notebook = nbf.reads(notebook_code, as_version=4) if isinstance(notebook_code, str) else notebook_code
-        for cell in notebook.cells:
-            if cell.cell_type == 'code':
-                st.code(cell.source, language='python')
-            elif cell.cell_type == 'markdown':
-                st.markdown(cell.source)
+    def show_ipynb_code(notebook_code: str | nbf.NotebookNode):
+        st.html("<span class='big-dialog'></span>")
+        
+        def convert_notebook_str_to_html(nb_str):
+            nb = nbf.reads(nb_str, as_version=4)
+            html_exporter = HTMLExporter()
+            body, _ = html_exporter.from_notebook_node(nb)
+            return body
+
+        notebook_str = nbf.writes(notebook_code, version=4) if isinstance(notebook_code, nbf.NotebookNode) else notebook_code
+        html = convert_notebook_str_to_html(notebook_str)
+        components.html(html, height=800, scrolling=True)
+        
         if st.button("Close"):
             st.rerun() 
     

@@ -3,6 +3,8 @@ import datetime
 
 import nbformat as nbf
 
+from .nbt_utils import CellMetadata
+
 notebook_template = nbf.v4.new_notebook()
 notebook_template.cells.extend([
     nbf.v4.new_code_cell("""
@@ -32,7 +34,9 @@ notebook_template.cells.extend([
         !pip install cartopy
         import cartopy.crs as ccrs
         import cartopy.feature as cfeature
-    """, metadata={"check_import": True}),
+    """, 
+    metadata={ CellMetadata.CHECK_IMPORT: True }),
+    
     nbf.v4.new_code_cell("""
         # Section "Define constant"
 
@@ -50,104 +54,144 @@ notebook_template.cells.extend([
 
         # ingested data ouput zarr file
         zarr_output = '{zarr_output}'
-    """, metadata={"need_format": True}),
+    """,
+    metadata={ CellMetadata.NEED_FORMAT: True }),
+    
     nbf.v4.new_code_cell("""
         # Section "Call I-Cisk cds-ingestor-process API"
 
-        # Prepare payload
-        icisk_api_payload = {{
-            "inputs": {{
-                "dataset": "seasonal-original-single-levels",
-                "file_out": f"/tmp/{{zarr_output.replace('.zarr', '')}}.nc",
-                "query": {{
-                    "originating_centre": "ecmwf",
-                    "system": "51",
-                    "variable": forecast_variables,
-                    "year": [f"{{init_time.year}}"],
-                    "month": [f"{{init_time.month:02d}}"],
-                    "day": ["01"],
-                    "leadtime_hour": [str(h) for h in range(24, int((lead_time - init_time).total_seconds() // 3600), 24)],
-                    "area": [
-                        region[3],
-                        region[0],
-                        region[1],
-                        region[2]
-                    ],
-                    "data_format": "netcdf",
-                }},
-                "token": "YOUR-ICISK-API-TOKEN",
-                "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{{zarr_output}}",
-            }}
-        }}
+        job_responses = { fc_var: { 'job_id': None, 'result': None } for fc_var in forecast_variables }
 
-        print(); print('-------------------------------------------------------------------'); print();
+        for fc_var in forecast_variables:
 
-        pprint.pprint(icisk_api_payload)
+            # Prepare payload
+            icisk_api_payload = {
+                "inputs": {
+                    "dataset": "seasonal-original-single-levels",
+                    "file_out": f"/tmp/{zarr_output.replace('.zarr', f'-{fc_var}')}.nc",
+                    "query": {
+                        "originating_centre": "ecmwf",
+                        "system": "51",
+                        "variable": [fc_var],
+                        "year": [f"{init_time.year}"],
+                        "month": [f"{init_time.month:02d}"],
+                        "day": ["01"],
+                        "leadtime_hour": [str(h) for h in range(24, int((lead_time - init_time).total_seconds() // 3600), 24)],
+                        "area": [
+                            region[3],
+                            region[0],
+                            region[1],
+                            region[2]
+                        ],
+                        "data_format": "netcdf",
+                    },
+                    "token": "YOUR-ICISK-API-TOKEN",
+                    "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_output.replace('.zarr', f'-{fc_var}')}.zarr",
+                }
+            }
 
-        print(); print('-------------------------------------------------------------------'); print();
+            print(); print('###################################################################'); print();
 
-        icisk_api_token = 'token' # getpass.getpass("YOUR ICISK-API-TOKEN: ")
+            print('• Payload')
+            pprint.pprint(icisk_api_payload)
 
-        icisk_api_payload['inputs']['token'] = icisk_api_token
+            print(); print('-------------------------------------------------------------------'); print();
 
-        # Call API
-        root_url = 'NGROK-URL' # 'https://i-cisk.dev.52north.org/ingest'
-        icisk_api_response = requests.post(
-            url = f'{{root_url}}/processes/ingestor-cds-process/execution',
-            json = icisk_api_payload
-        )
+            icisk_api_token = 'token' # getpass.getpass("YOUR ICISK-API-TOKEN: ")
 
-        # Display response
-        pprint.pprint({{
-            'response': icisk_api_response.json(),
-            'status_code': icisk_api_response.status_code,
-        }})
+            icisk_api_payload['inputs']['token'] = icisk_api_token
+
+            # Call API
+            root_url = 'https://i-cisk.dev.52north.org/ingest'
+            icisk_api_response = requests.post(
+                url = f'{root_url}/processes/ingestor-cds-process/execution',
+                headers = { 'Prefer': 'respond-async' },
+                json = icisk_api_payload
+            )
+
+            # Get job id
+            job_id = icisk_api_response.headers['Location'].split("/")[-1]
+            job_responses[fc_var]['job_id'] = job_id
+
+            # Display response
+            print('• Response')
+            pprint.pprint({
+                'job_id': job_id,
+                'status_code': icisk_api_response.status_code,
+            })
+
+            print(); print('###################################################################'); print();
     """),
+    
+    nbf.v4.new_code_cell("""
+        # Section "Check job status"
+                         
+        timesleep = 30
+
+        while any([job_response['result'] == None for job_response in job_responses.values()]):
+            for fc_var,job_response in job_responses.items():
+                if job_response['result'] is None:
+                    job_status = requests.get(f'{root_url}/jobs/{job_response["job_id"]}?f=json').json()['status']
+                    if job_status in ["failed", "successful", "dismissed"]:
+                        job_response['result'] = requests.get(f'{root_url}/jobs/{job_id}/results?f=json').json()
+                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} completed')
+                    else:
+                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} status is "{job_status}" - retring in {timesleep} seconds')
+            if any([job_response['result']==None for job_response in job_responses.values()]):
+                time.sleep(timesleep)
+    """),
+    
     nbf.v4.new_code_cell("""
         # Section "Get data from I-Cisk collection"
 
-        living_lab = None
-        collection_name = f"seasonal-original-single-levels_{{init_time.strftime('%Y%m')}}_{{living_lab}}_{icisk_varname}_0"
+        dataset_list = []
 
-        # Query collection
-        collection_response = requests.get(
-            f'{{root_url}}/collections/{{collection_name}}/cube',
-            params = {{
-                'bbox': ','.join(map(str, region)),
-                'f': 'json'
+        for fc_var in {forecast_variables_icisk}:
+
+            living_lab = None
+            collection_name = f"seasonal-original-single-levels_{{init_time.strftime('%Y%m')}}_{{living_lab}}_{{fc_var}}_0"
+
+            # Query collection
+            collection_response = requests.get(
+                f'{{root_url}}/collections/{{collection_name}}/cube',
+                params = {{
+                    'bbox': ','.join(map(str, region)),
+                    'f': 'json'
+                }}
+            )
+
+            # Get response
+            if collection_response.status_code == 200:
+                collection_data = collection_response.json()
+            else:
+                print(f'Error {{collection_response.status_code}}: {{collection_response.json()}}')
+
+            # Parse collection output data
+            axes = collection_data['domain']['axes']
+            params = collection_data['parameters']
+            ranges = collection_data['ranges']
+
+            dims = {{
+                'model': list(map(int, [p.split('_')[1] for p in params])),
+                'time': pd.date_range(axes['time']['start'], axes['time']['stop'], axes['time']['num']),
+                'lon': np.linspace(axes['x']['start'], axes['x']['stop'], axes['x']['num'], endpoint=True),
+                'lat': np.linspace(axes['y']['start'], axes['y']['stop'], axes['y']['num'], endpoint=True)
             }}
-        )
+            vars = {{
+                fc_var: (tuple(dims.keys()), np.stack([ np.array(ranges[name]['values']).reshape((len(dims['time']), len(dims['lon']), len(dims['lat']))) for name in params ]) )
+            }}
 
-        # Get response
-        if collection_response.status_code == 200:
-            collection_data = collection_response.json()
-        else:
-            print(f'Error {{collection_response.status_code}}: {{collection_response.json()}}')
-    """),
-    nbf.v4.new_code_cell("""
-        # Section "Build dataset"
+            # Build xarray dataset
+            dataset = xr.Dataset(
+                data_vars = vars,
+                coords = dims
+            )
+            dataset_list.append(dataset)
 
-        # Parse collection output data
-        axes = collection_data['domain']['axes']
-        dims = {{
-            'model': list(map(int, [p.split('_')[1] for p in params])),
-            'time': pd.date_range(axes['time']['start'], axes['time']['stop'], axes['time']['num']),
-            'lon': np.linspace(axes['x']['start'], axes['x']['stop'], axes['x']['num'], endpoint=True),
-            'lat': np.linspace(axes['y']['start'], axes['y']['stop'], axes['y']['num'], endpoint=True)
-        }}
-
-        params = collection_data['parameters']
-        ranges = collection_data['ranges']
-        vars = {{
-            '{icisk_varname}': (tuple(dims.keys()), np.stack([ np.array(ranges[name]['values']).reshape((len(dims['time']), len(dims['lon']), len(dims['lat']))) for name in params ]) )
-        }}
-
-        # Build xarray dataset
-        dataset = xr.Dataset(
-            data_vars = vars,
-            coords = dims
-        )
-    """, metadata={"need_format": True}),
+        dataset = xr.merge(dataset_list).sortby(['model', 'time', 'lat', 'lon'])
+    """,
+    metadata={ CellMetadata.NEED_FORMAT: True }),
+    
     nbf.v4.new_code_cell("""
         # Section "Describe dataset"
 
@@ -158,11 +202,12 @@ notebook_template.cells.extend([
         - 'lat': list of latitudes, 
         - 'lon': list of longitudes,
         - 'time': forecast timesteps
-        It has 1 variables named {icisk_varname} representing the {cds_varname} forecast data. It has a shape of [model, time, lat, lon].
+        It has these variables: {forecast_variables_icisk} representing the {forecast_variables} forecast data values. Variables have a shape of [model, time, lat, lon].
         \"\"\"
 
         # Use this dataset variable to do next analysis or plots
 
         display(dataset)
-    """, metadata={"need_format": True})
+    """, 
+    metadata={ CellMetadata.NEED_FORMAT: True })
 ])

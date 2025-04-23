@@ -6,6 +6,9 @@ from langgraph.graph import END
 from langgraph.types import Command
 
 from langgraph.prebuilt import ToolNode
+from langchain_core.messages import BaseMessage
+from langchain_core.runnables import Runnable
+from langchain_core.language_models import LanguageModelInput
 
 from agent import utils
 from agent import names as N
@@ -39,6 +42,13 @@ tool_node = ToolNode([tool for tool in tools_map.values()])
 llm_with_tools = utils._base_llm.bind_tools([tool for tool in tools_map.values()])
 
 
+def set_tool_choice(tool_choice: str = None) -> Runnable[LanguageModelInput, BaseMessage]:
+    if tool_choice is None:
+        llm_with_tools = utils._base_llm.bind_tools([tool for tool in tools_map.values()])
+    else:
+        llm_with_tools = utils._base_llm.bind_tools([tool for tool in tools_map.values()], tool_choice=tool_choice)
+    return llm_with_tools
+
 
 def chatbot_update_messages(state: BaseGraphState):
     """Update the messages in the state with the new messages."""
@@ -53,6 +63,8 @@ def chatbot(state: BaseGraphState) -> Command[Literal[END, N.CHATBOT_UPDATE_MESS
         
         if state.get("node_params", dict()).get(N.CHATBOT_UPDATE_MESSAGES, None) is not None:
             return Command(goto=N.CHATBOT_UPDATE_MESSAGES)
+        
+        llm_with_tools = set_tool_choice(tool_choice = state.get("node_params", dict()).get(N.CHATBOT, dict()).get("tool_choice", None))
             
         ai_message = llm_with_tools.invoke(state["messages"])
         

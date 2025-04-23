@@ -134,6 +134,8 @@ class SPIForecastNotebookTool(BaseAgentTool):
                     if ka['lead_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['lead_time'], "%Y-%m-%d"), None) is None else None,
                 lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be in the after the init time."
                     if ka['init_time'] is not None and ka['lead_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') < datetime.datetime.strptime(ka['init_time'], '%Y-%m-%d'), False) else None,
+                lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be no more than 6 months in the future."
+                    if ka['lead_time'] is not None and datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') > (datetime.datetime.now().replace(day=1) + relativedelta.relativedelta(months=6)) else None
             ],
             'jupyter_notebook': [
                 lambda **ka: f"Invalid notebook path: {ka['jupyter_notebook']}. It should be a valid jupyter notebook file path."

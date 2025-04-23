@@ -9,10 +9,11 @@ class CellMetadata():
     NEED_FORMAT = "NEED_FORMAT"             # DOC: wiil use a dict to format the cell — (Default set to False)
     CHECK_IMPORT = "CHECK_IMPORT"           # DOC: will check if the imports are already in the notebook and discard them — (Default set to False)
     CHECK_EXISTENCE = "CHECK_EXISTENCE"     # DOC: will check if the cell already exists in the notebook and discard it — (Default set to Fal)
+    MODE = "MODE"                           # DOC: will use the cell based on the mode attribute of the tool — (Default is unset)
     
     
 
-def write_notebook_template(notebook: nbf.NotebookNode, values_dict: dict = dict()) -> nbf.NotebookNode:
+def write_notebook_template(notebook: nbf.NotebookNode, values_dict: dict = dict(), mode = None) -> nbf.NotebookNode:
     
     def safe_code_lines(code: str, format_dict: dict = None) -> str:
         if format_dict is not None:
@@ -36,15 +37,36 @@ def write_notebook_template(notebook: nbf.NotebookNode, values_dict: dict = dict
             lines = [ l for l in lines if l.strip() not in context_code ]
             return '\n'.join(lines)
     
-    for ic,cell in enumerate(notebook.cells):
-        cell.source = safe_code_lines(cell.source, format_dict=values_dict if cell.metadata.get("need_format", False) else None)
-        if cell.metadata.get("check_import", False):
-            previous_import_code = '\n'.join([c.source for c in notebook.cells[:ic] if c.metadata.get("check_import", False)])
+    def compile_cell(cell):
+        cell.source = safe_code_lines(cell.source, format_dict=values_dict if cell.metadata.get(CellMetadata.NEED_FORMAT, False) else None)
+        if cell.metadata.get(CellMetadata.CHECK_IMPORT, False):
+            previous_import_code = '\n'.join([c.source for c in notebook.cells[:ic] if c.metadata.get(CellMetadata.CHECK_IMPORT, False)])
             cell.source = necessary_imports(cell.source, context_code=previous_import_code)
-        if cell.metadata.get("check_existence", False):
+        if cell.metadata.get(CellMetadata.CHECK_EXISTENCE, False):
             if any([cell.source == pc.source for pc in notebook.cells[:ic]]):
                 cell.source = ""
+        return cell
+    
+    compiled_cells = []
+    for ic,cell in enumerate(notebook.cells):
+        if mode is None:
+            cell = compile_cell(cell)
+        elif cell.metadata.get(CellMetadata.MODE, None) is None or cell.metadata.get(CellMetadata.MODE, None) == mode:
+            cell = compile_cell(cell)
+        else:
+            continue
+        compiled_cells.append(cell)
+        
+        # cell.source = safe_code_lines(cell.source, format_dict=values_dict if cell.metadata.get(CellMetadata.NEED_FORMAT, False) else None)
+        # if cell.metadata.get(CellMetadata.CHECK_IMPORT, False):
+        #     previous_import_code = '\n'.join([c.source for c in notebook.cells[:ic] if c.metadata.get(CellMetadata.CHECK_IMPORT, False)])
+        #     cell.source = necessary_imports(cell.source, context_code=previous_import_code)
+        # if cell.metadata.get(CellMetadata.CHECK_EXISTENCE, False):
+        #     if any([cell.source == pc.source for pc in notebook.cells[:ic]]):
+        #         cell.source = ""
+        
+        # compiled_cells.append(cell)
        
-    notebook.cells = [cell for cell in notebook.cells if cell.cell_type != "code" or cell.source.replace('\n', '').strip() != ""]     
+    notebook.cells = [cell for cell in compiled_cells if cell.cell_type != "code" or cell.source.replace('\n', '').strip() != ""]     
     
     return notebook        

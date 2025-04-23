@@ -15,6 +15,7 @@ from langchain_core.callbacks import (
 from agent import utils
 from agent import names as N
 from agent.nodes.base import BaseAgentTool
+from agent.common.notebook_templates import nbt_utils
 from agent.common.notebook_templates.nbt_cds_fc_era5_seasonal import notebook_template as nbt_cds_fc_era5_seasonal
 from db import DBI, DBS
 
@@ -80,9 +81,9 @@ class CDSForecastNotebookTool(BaseAgentTool):
                 None,
                 ['total_precipitation'],
                 ['temperature'],
-                ['glofas']
-                # ['min_temperature', 'max_temperature'],
-                # ['total_precipitation', 'glofas'],
+                ['glofas'],
+                ['min_temperature', 'max_temperature'],
+                ['total_precipitation', 'glofas'],
             ]
         )
         area: None | str | list[float] = Field(
@@ -172,10 +173,10 @@ class CDSForecastNotebookTool(BaseAgentTool):
         
         return {
             'forecast_variables' : [
-                lambda **ka: f"Invalid forecast variables: {ka['forecast_variables']}. By now only one variable is supported." 
-                    if len(ka['forecast_variables']) > 1 else None,
                 lambda **ka: f"Invalid forecast variables: {[v for v in ka['forecast_variables'] if self.InputForecastVariable.from_str(v) is None]}. It should be a list of valid CDS forecast variables: {[self.InputForecastVariable._member_names_]}."
-                    if len([v for v in ka['forecast_variables'] if self.InputForecastVariable.from_str(v) is None]) > 0 else None 
+                    if len([v for v in ka['forecast_variables'] if self.InputForecastVariable.from_str(v) is None]) > 0 else None, 
+                lambda **ka: f"Invalid combination of variables: {ka['forecast_variables']}. By now, due to different data proveder settings, GLOFAS can't be used in the same tool with other variables."
+                    if self.InputForecastVariable.glofas in [self.InputForecastVariable.from_str(v) for v in ka['forecast_variables']] and len(ka['forecast_variables']) > 1 else None,
             ],
             'area': [
                 lambda **ka: f"Invalid area coordinates: {ka['area']}. It should be a list of 4 float values representing the bounding box [min_x, min_y, max_x, max_y]." 
@@ -192,6 +193,8 @@ class CDSForecastNotebookTool(BaseAgentTool):
                     if ka['lead_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['lead_time'], "%Y-%m-%d"), None) is None else None,
                 lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be in the after the init time."
                     if ka['init_time'] is not None and ka['lead_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') < datetime.datetime.strptime(ka['init_time'], '%Y-%m-%d'), False) else None,
+                lambda **ka: f"Invalid lead time: {ka['lead_time']}. It should be no more than 6 months in the future."
+                    if ka['lead_time'] is not None and datetime.datetime.strptime(ka['lead_time'], '%Y-%m-%d') > (datetime.datetime.now().replace(day=1) + relativedelta.relativedelta(months=6)) else None
             ],
             'zarr_output': [
                 lambda **ka: f"Invalid output path: {ka['zarr_output']}. It should be a valid zarr file path."
@@ -285,12 +288,9 @@ class CDSForecastNotebookTool(BaseAgentTool):
             'lead_time': lead_time,
             'zarr_output': zarr_output,
             
-            'cds_varname': self.InputForecastVariable(forecast_variables[0]).as_cds,
-            'icisk_varname': self.InputForecastVariable(forecast_variables[0]).as_icisk,
+            'forecast_variables_icisk': [self.InputForecastVariable(var).as_icisk for var in forecast_variables],
         }
-        for cell in self.notebook.source.cells:
-            if cell.cell_type in ("markdown", "code"):
-                cell.source = utils.safe_code_lines(cell.source, format_dict=nb_values if cell.metadata.get("need_format", False) else None)
+        self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values)   
         DBI.save_notebook(self.notebook)
         
         return {
