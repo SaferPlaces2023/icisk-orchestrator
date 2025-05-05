@@ -26,13 +26,13 @@ st.markdown("### 🧠 ICisk AI Agent")
 with st.sidebar:
     
     # DOC: Sidebar element used as a menu for the user
-    with st.expander("**🚀 Quick actions**"):
+    with st.expander("**🚀 Quick actions**", expanded=True):
         if st.button("New chat", type="primary", help="Start a new chat"):
             session_manager.close_chat()
             session_manager.setup(session_manager.user_id)
             st.rerun()
         
-        col_tool_choice, col_tool_flag = st.columns([10, 1], vertical_alignment="center")    
+        col_tool_choice, col_tool_flag = st.columns([7  , 1], vertical_alignment="center")    
         with col_tool_choice:
             session_manager.gui.tool_choice = st.selectbox(
                 f"Select specific tool to use",
