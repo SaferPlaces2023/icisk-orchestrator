@@ -8,7 +8,7 @@ from webapp.session.state import session_manager
 
 
 
-st.set_page_config(page_title="ICisk AI Agent — Login", page_icon="🔐", layout="wide")
+st.set_page_config(page_title="ICisk AI Orchestrator — Login", page_icon="🔐", layout="wide")
 
 
 
@@ -27,7 +27,7 @@ _, center_col, _ = st.columns([1, 1, 1], vertical_alignment="center")
 
 with center_col:   
     
-    st.markdown("## **🔐 ICisk AI Agent — Login**")
+    st.markdown("## **🔐 ICisk AI Orchestrator — Login**")
 
     with st.form("login-form"):
         st.markdown("Please enter your user ID to log in. If you don't have an account, please contact the administrator.")

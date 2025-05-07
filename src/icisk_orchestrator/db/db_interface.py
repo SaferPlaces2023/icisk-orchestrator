@@ -50,7 +50,7 @@ class DatabaseInterface():
         
         self.connect()
         
-        notebooks_collection = self.db[DBS.Collections.NOTEBOOKS]     # TODO: Move names to db-schema-class
+        notebooks_collection = self.db[DBS.Collections.NOTEBOOKS]
         
         # DOC: All notebooks will be visible to admin
         if 'admin' not in notebook.authors:

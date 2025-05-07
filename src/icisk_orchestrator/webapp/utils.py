@@ -51,3 +51,31 @@ def dialog_notebook_code(dialog_title: str, notebook_code: str | nbf.NotebookNod
             st.rerun() 
     
     show_ipynb_code(notebook_code)
+    
+    
+def css_component(component, key: str, css_dict: dict[str, str], **component_args):
+    """
+    A function to create a Streamlit component with custom CSS styles.
+    
+    Parameters:
+    - component: The Streamlit component to be styled.
+    - key: The key for the component in the Streamlit session state.
+    - css_dict: A dictionary containing CSS properties and their values.
+    - **component_args: Additional arguments for the component.
+    
+    Returns:
+    - The rendered component with custom CSS styles.
+    """
+    css = "\n".join([f"{k}: {v};" for k, v in css_dict.items()])
+    st.markdown(
+        f"""
+        <style>
+        .st-key-{key} {{
+            {css}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    return component(key=key, **component_args)
+    

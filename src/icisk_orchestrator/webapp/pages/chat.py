@@ -19,8 +19,8 @@ from db import DBI, DBS
 
 
 
-st.set_page_config(page_title="ICisk AI Agent", page_icon="🧠", layout="wide")
-st.markdown("### 🧠 ICisk AI Agent")
+st.set_page_config(page_title="ICisk AI Orchestrator", page_icon="🧠", layout="wide")
+st.markdown("### 🧠 ICisk AI Orchestrator")
 
 
 with st.sidebar:
@@ -71,33 +71,34 @@ with st.sidebar:
             st.markdown("No files uploaded yet.")
         
         else:
-            for ifn,file_obj in enumerate(avaliable_files):
-                filename = file_obj.name
-                col_name, col_view, col_download = st.columns([5, 1, 1], vertical_alignment="center")
-                
-                with col_name:
-                    st.markdown(f">  **`{filename}`**")
+            with utils.css_component(st.container, key='file-container', css_dict={'max-height': '400px', 'overflow-y': 'scroll'}):
+                for ifn,file_obj in enumerate(avaliable_files):
+                    filename = file_obj.name
+                    col_name, col_view, col_download = st.columns([5, 1, 1], vertical_alignment="center")
                     
-                with col_view:
-                    if st.button("👁️", key=f"view_{filename}-{ifn}", help="view file"):
-                        utils.dialog_notebook_code(
-                            dialog_title = filename,
-                            notebook_code = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source_code,
-                        )
+                    with col_name:
+                        st.markdown(f">  **`{filename}`**")
                         
-                with col_download:
-                    if session_manager.gui.is_requested_download(filename):
-                        st.download_button(
-                            label = "📥",
-                            data = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source_code,
-                            file_name = filename,
-                            mime = "json/ipynb",
-                            key = f"download_{filename}-{ifn}"
-                        )
-                    else:
-                        if st.button("📁", key=f"pre-download_{filename}-{ifn}", help="request download"):
-                            session_manager.gui.request_download(filename)
-                            st.rerun()
+                    with col_view:
+                        if st.button("👁️", key=f"view_{filename}-{ifn}", help="view file"):
+                            utils.dialog_notebook_code(
+                                dialog_title = filename,
+                                notebook_code = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source_code,
+                            )
+                            
+                    with col_download:
+                        if session_manager.gui.is_requested_download(filename):
+                            st.download_button(
+                                label = "📥",
+                                data = DBI.notebook_by_name(author=session_manager.user_id, notebook_name=filename, retrieve_source=True).source_code,
+                                file_name = filename,
+                                mime = "json/ipynb",
+                                key = f"download_{filename}-{ifn}"
+                            )
+                        else:
+                            if st.button("📁", key=f"pre-download_{filename}-{ifn}", help="request download"):
+                                session_manager.gui.request_download(filename)
+                                st.rerun()
                         
         st.divider()
         
@@ -121,46 +122,6 @@ with st.sidebar:
                 st.rerun()
 
 
-    # TODO: Sidebar element (Will be used for previous chat)
-    with st.expander("📚 **Previous chats** — _[ future dev ]_"):
-        st.markdown("Previous chats will be displayed here.")
-        
-        chat_register = session_manager.gui.chat_register
-        
-        for chat in chat_register:
-            st.markdown(f"- **`{chat.title}`**")
-        
-
-    # TODO: Sidebar element (Will be used for displaying graph state)
-    with st.expander("🔗 **Graph state** — _[ future dev ]_"):
-        st.markdown("Graph state will be displayed here.")
-        from st_link_analysis import st_link_analysis, NodeStyle, EdgeStyle
-        elements = {
-            "nodes": [
-                { 
-                    "data": {
-                        "id": idn,
-                        "label": node
-                    } 
-                } 
-                for idn, node in enumerate(session_manager.node_history)
-            ],
-            "edges": [
-                { 
-                    "data": {
-                        "id": idn+len(session_manager.node_history), 
-                        "label": "next",
-                        "source": idn,
-                        "target": idn+1
-                    }
-                } 
-                for idn in range(len(session_manager.node_history)-1)
-            ],
-        }
-        # Render the component
-        st.markdown("### st-link-analysis: Example")
-        st_link_analysis(elements, "cose")
-
 
 with st.expander("# 💡 **What is this application?** "):
     st.markdown(
@@ -170,10 +131,13 @@ with st.expander("# 💡 **What is this application?** "):
             
         The goal is to simplify environmental data analysis through an intelligent conversational interface capable of guiding users step by step in building their data workflows.  
         
-        **This is a demo version**. At the moment, it can assist with the calculation of the **Standardized Precipitation Index (SPI)**.  
+        **This is a beta version**. At the moment, it can assist in: 
+        - Obtaining historical and forecast data relating to precipitation, temperature, and river discharge (with notebook creation).
+        - Calculation of the **Standardized Precipitation Index (SPI)** with historical and forecast data (with notebook creation).
+        - Code generation targeted to created notebooks.
         Additional processing capabilities will be available soon. 
         
-        For more details, simply interact with the bot.
+        For more details _(i.e: on the agent or on the used data)_, simply interact with the bot.
         """
     )
 
@@ -182,14 +146,7 @@ with st.expander("# 💡 **What is this application?** "):
 for message in session_manager.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-
-# FIXME: This is not workig. fix and substitute with the above code
-# if session_manager.chat is not None:
-#     for message in session_manager.chat.messages:
-#         with st.chat_message(message.get('role', 'user')):
-#             st.markdown(message.get("content", ''))
-
-
+        
 
     
 def render_message(role, content):
@@ -201,13 +158,9 @@ def render_message(role, content):
     st.chat_message(role, avatar=avatar[role]).markdown(content)
     session_manager.chat_history.append({"role": role, "content": content})
 
-
-
 def render_user_prompt(prompt):
     render_message("user", prompt)
 
-
-    
 def render_agent_response(message):
     
     if len(message.get('tool_calls', [])) > 0:
@@ -240,7 +193,6 @@ def handle_response(response):
         
         if message is not None and message.get('type', None) != 'system':
             render_agent_response(message)
-        # st.rerun()  # TODO: Will substitute above code (works with the fixme code above)
             
 
 prompt = st.chat_input(key="chat-input", placeholder="Scrivi un messaggio")    
@@ -248,10 +200,6 @@ prompt = st.chat_input(key="chat-input", placeholder="Scrivi un messaggio")
 if prompt:
     session_manager.update_chat({"type": "human", "content": prompt})
     render_user_prompt(prompt)
-    
-    print('\n\n')
-    print(f"Chat:", session_manager.chat.messages)
-    print('\n\n')
     
     def optional_resume_interrupt():
         out = dict()
