@@ -70,7 +70,7 @@ class SPIHistoricNotebookTool(BaseAgentTool):
         )
         end_time: None | str = Field(
             title = "End Time",
-            description = f"The end date provided in UTC-0 YYYY-MM-DD. If not specified use: {(datetime.datetime.now() - relativedelta.relativedelta(months=-1)).strftime('%Y-%m-01')} as default.",
+            description = f"The end date provided in UTC-0 YYYY-MM-DD. It must be after the start_time arg. If not specified use: {(datetime.datetime.now() - relativedelta.relativedelta(months=-1)).strftime('%Y-%m-01')} as default.",
             examples = [
                 None,
                 "2025-02-01",
@@ -171,7 +171,7 @@ class SPIHistoricNotebookTool(BaseAgentTool):
         
         def infer_jupyter_notebook(**ka):
             if ka['jupyter_notebook'] is None:
-                return f"icisk-ai_spi-historic-calculation_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
+                return f"icisk-ai_spi-historic_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
             return ka['jupyter_notebook']
         
         return {
@@ -192,7 +192,7 @@ class SPIHistoricNotebookTool(BaseAgentTool):
                 source = nbf.v4.new_notebook()
             )
           
-        self.notebook.source.cells.extend(nbt_spi_historic.cells)    
+        self.notebook.source.cells.extend(nbt_utils.notebook_copy(nbt_spi_historic).cells)    
         
         
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file
@@ -213,6 +213,9 @@ class SPIHistoricNotebookTool(BaseAgentTool):
         }
         self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values)
         DBI.save_notebook(self.notebook)
+        
+        # DOC: Back to a consisent state
+        self.execution_confirmed = False
         
         return {
             "notebook": jupyter_notebook

@@ -36,12 +36,7 @@ class DatabaseInterface():
     
     def save_notebook(
         self, 
-        notebook: DBS.Notebook,
-        # _id: str | ObjectId,
-        # name: str,
-        # source: str | nbf.NotebookNode,
-        # authors: str | list[str],
-        # description: str = None
+        notebook: DBS.Notebook
     ):
         """
         Save a notebook to the database.
@@ -57,23 +52,9 @@ class DatabaseInterface():
         
         notebooks_collection = self.db[DBS.Collections.NOTEBOOKS]     # TODO: Move names to db-schema-class
         
-        # # DOC: If source is a string, it is converted to a NotebookNode object
-        # if isinstance(source, str):
-        #     source = nbf.reads(source, as_version=4)
-        
         # DOC: All notebooks will be visible to admin
-        # if isinstance(authors, str):
-        #     authors = [ authors ]
         if 'admin' not in notebook.authors:
             notebook.authors.append('admin')
-        
-        # DOC: Create the notebook document to be inserted or updated in the collection
-        # notebook_document = {
-        #     'name': notebook.name,
-        #     'source': nbf.writes(source),
-        #     'authors': authors,
-        #     'description': notebook.description,
-        # }
         
         # DOC: If notebook_id is None, we are creating a new notebook, otherwise we are updating an existing one
         if notebook._id is None:

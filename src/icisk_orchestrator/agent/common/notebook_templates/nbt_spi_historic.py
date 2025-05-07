@@ -46,9 +46,9 @@ notebook_template.cells.extend([
 
         reference_period = {reference_period} # start_year, end_year
 
-        start_time = datetime.datetime.strptime({start_time}, "%Y-%m")
+        start_time = datetime.datetime.strptime('{start_time}', "%Y-%m-%d").replace(day=1)
         
-        end_time = datetime.datetime.strptime({end_time}, "%Y-%m")
+        end_time = datetime.datetime.strptime('{end_time}', "%Y-%m-%d").replace(day=1)
 
         cds_client = cdsapi.Client(url='https://cds.climate.copernicus.eu/api', key=getpass.getpass("YOUR CDS-API-KEY")) # CDS client
     """, 
@@ -88,14 +88,6 @@ notebook_template.cells.extend([
     
     nbf.v4.new_code_cell("""
         # Section "Get period-of-interest data"
-        curr_date = datetime.datetime.now().date()
-        if start_time.strftime('%Y-%m') >= curr_date.strftime('%Y-%m'):
-            init_date = datetime.datetime.now().replace(day=1).date()
-        else:
-            init_date = start_time.replace(day=1)
-
-        start_hour = max(24, (start_time - init_date).days*24)
-        end_hour = min(5160, (end_time - start_time).days*24 + start_hour)
         
         def build_cds_hourly_data_filepath(year, month):
             dataset_part = 'reanalysis_era5_land__total_precipitation__hourly'
@@ -114,6 +106,19 @@ notebook_template.cells.extend([
         def ceil_decimals(number, decimals=0):
             factor = 10 ** decimals
             return math.ceil(number * factor) / factor
+            
+        spi_start_date = init_time - relativedelta(months=spi_ts-1)
+        spi_years_range = list(range(spi_start_date.year, lead_time.year+1))
+        spi_month_range = []
+        for iy,year in enumerate(range(spi_years_range[0], spi_years_range[-1]+1)):
+            if iy==0 and len(spi_years_range)==1:
+                spi_month_range.append([month for month in range(spi_start_date.month, lead_time.month+1)])
+            elif iy==0 and len(spi_years_range)>1:
+                spi_month_range.append([month for month in range(spi_start_date.month, 13)])
+            elif iy>0 and iy==len(spi_years_range)-1:
+                spi_month_range.append([month for month in range(1, lead_time.month+1)])
+            else:
+                spi_month_range.append([month for month in range(1, 13)])
 
         # CDS API query
         cds_poi_data_filepaths = []

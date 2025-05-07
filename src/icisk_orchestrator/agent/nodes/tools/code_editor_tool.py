@@ -116,6 +116,9 @@ class CodeEditorTool(BaseAgentTool):
         else:
             generated_code = self.output['generated_code']
             add_source_code(generated_code)
+            
+        # DOC: Back to a consisent state
+        self.output_confirmed = False
                         
         return {
             "notebook": source,

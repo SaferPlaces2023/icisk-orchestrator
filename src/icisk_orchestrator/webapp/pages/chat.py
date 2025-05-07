@@ -64,6 +64,9 @@ with st.sidebar:
     with st.expander("**📁 File manager**"):
         avaliable_files = session_manager.gui.filenames
         
+        if st.button("Refresh", help="Refresh file list", type='tertiary', icon=":material/refresh:"):
+            st.rerun()
+        
         if len(avaliable_files) == 0:
             st.markdown("No files uploaded yet.")
         
@@ -73,7 +76,7 @@ with st.sidebar:
                 col_name, col_view, col_download = st.columns([5, 1, 1], vertical_alignment="center")
                 
                 with col_name:
-                    st.markdown(f"- **`{filename}`**")
+                    st.markdown(f">  **`{filename}`**")
                     
                 with col_view:
                     if st.button("👁️", key=f"view_{filename}-{ifn}", help="view file"):

@@ -14,6 +14,7 @@ notebook_template.cells.extend([
 
         import os
         import json
+        import time
         import datetime
         import requests
         import getpass
@@ -41,7 +42,7 @@ notebook_template.cells.extend([
         # Section "Define constant"
         
         # CDS Dataset name
-        dataset_name = {dataset_name}
+        dataset_name = '{dataset_name}'
 
         # Forcast variables
         forecast_variables = {forecast_variables}
@@ -70,7 +71,7 @@ notebook_template.cells.extend([
             # Prepare payload
             icisk_api_payload = {
                 "inputs": {
-                    "dataset": "seasonal-original-single-levels",
+                    "dataset": dataset_name,
                     "file_out": f"/tmp/{zarr_output.replace('.zarr', f'-{fc_var}')}.nc",
                     "query": {
                         "originating_centre": "ecmwf",
@@ -139,7 +140,7 @@ notebook_template.cells.extend([
                 "inputs": {
                     "dataset": dataset_name,
                     "service": "EWDS",
-                    "file_out": f"/tmp/{zarr_out.replace('.zarr', '')}.nc",
+                    "file_out": f"/tmp/{zarr_output.replace('.zarr', '')}.nc",
                     "query": {
                         "system_version": ["operational"],
                         "hydrological_model": [
@@ -162,7 +163,7 @@ notebook_template.cells.extend([
                         "download_format": "unarchived"
                     },
                     "token": "YOUR-ICISK-API-TOKEN",
-                    "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_out}",
+                    "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_output}",
                 }
             }
 
@@ -211,7 +212,7 @@ notebook_template.cells.extend([
                     job_status = requests.get(f'{root_url}/jobs/{job_response["job_id"]}?f=json').json()['status']
                     if job_status in ["failed", "successful", "dismissed"]:
                         job_response['result'] = requests.get(f'{root_url}/jobs/{job_id}/results?f=json').json()
-                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} completed')
+                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} is {job_status}')
                     else:
                         print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} status is "{job_status}" - retring in {timesleep} seconds')
             if any([job_response['result']==None for job_response in job_responses.values()]):
@@ -226,7 +227,7 @@ notebook_template.cells.extend([
         for fc_var in {forecast_variables_icisk}:
 
             living_lab = None
-            collection_name = f"seasonal-original-single-levels_{{init_time.strftime('%Y%m')}}_{{living_lab}}_{{fc_var}}_0"
+            collection_name = f"{{dataset_name}}_{{init_time.strftime('%Y%m')}}_{{living_lab}}_{{fc_var}}_0"
 
             # Query collection
             collection_response = requests.get(
@@ -239,7 +240,7 @@ notebook_template.cells.extend([
 
             # Get response
             if collection_response.status_code == 200:
-                collection_data = collection_response.json()
+                collection_data = json.loads(collection_response.content)
             else:
                 print(f'Error {{collection_response.status_code}}: {{collection_response.json()}}')
 
@@ -247,10 +248,15 @@ notebook_template.cells.extend([
             axes = collection_data['domain']['axes']
             params = collection_data['parameters']
             ranges = collection_data['ranges']
+            
+            time_axis = {{
+                'seasonal-original-single-levels': 'time',
+                'cems-glofas-seasonal': 'forecast_period'
+            }}[dataset_name]
 
             dims = {{
                 'model': list(map(int, [p.split('_')[1] for p in params])),
-                'time': pd.date_range(axes['time']['start'], axes['time']['stop'], axes['time']['num']),
+                'time': pd.date_range(axes[time_axis]['start'], axes[time_axis]['stop'], axes[time_axis]['num']),
                 'lon': np.linspace(axes['x']['start'], axes['x']['stop'], axes['x']['num'], endpoint=True),
                 'lat': np.linspace(axes['y']['start'], axes['y']['stop'], axes['y']['num'], endpoint=True)
             }}
@@ -265,26 +271,19 @@ notebook_template.cells.extend([
             )
             dataset_list.append(dataset)
 
-        dataset_cds_forecast = xr.merge(dataset_list).sortby(['model', 'time', 'lat', 'lon'])
+        {dataset_var_name} = xr.merge(dataset_list).sortby(['model', 'time', 'lat', 'lon'])
     """,
     metadata={ CellMetadata.NEED_FORMAT: True }),
     
     nbf.v4.new_code_cell("""
-        # Section "Describe dataset"
+        # Section "Describe {dataset_var_name}"
 
-        \"\"\"
-        Object "dataset_cds_forecast" is a xarray.Dataset
-        It has four dimensions named:
-        - 'model': list of model ids 
-        - 'lat': list of latitudes, 
-        - 'lon': list of longitudes,
-        - 'time': forecast timesteps
-        It has these variables: {forecast_variables_icisk} representing the {forecast_variables} forecast data values. Variables have a shape of [model, time, lat, lon].
-        \"\"\"
+        {dataset_var_description}
 
-        # Use the dataset_cds_forecast variable to do next analysis or plots
+        # Use the {dataset_var_name} variable to do next analysis or plots
 
-        display(dataset_cds_forecast)
+        display({dataset_var_name})
     """, 
     metadata={ CellMetadata.NEED_FORMAT: True })
+    
 ])

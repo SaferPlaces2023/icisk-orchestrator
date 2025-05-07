@@ -71,7 +71,7 @@ class SPIForecastNotebookTool(BaseAgentTool):
         )
         lead_time: None | str = Field(
             title = "Lead Time",
-            description = f"The end date of the forecast lead time provided in UTC-0 YYYY-MM-DD. If not specified use: {(datetime.datetime.now().date().replace(day=1) + datetime.timedelta(days=31)).strftime('%Y-%m-01')} as default.",
+            description = f"The end date of the forecast lead time provided in UTC-0 YYYY-MM-DD. It must be after the init_time arg. If not specified use: {(datetime.datetime.now().date().replace(day=1) + datetime.timedelta(days=31)).strftime('%Y-%m-01')} as default.",
             examples = [
                 None,
                 "2025-02-01",
@@ -172,7 +172,7 @@ class SPIForecastNotebookTool(BaseAgentTool):
         
         def infer_jupyter_notebook(**ka):
             if ka['jupyter_notebook'] is None:
-                return f"icisk-ai_spi-forecast-calculation_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
+                return f"icisk-ai_spi-forecast_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
             return ka['jupyter_notebook']
         
         return {
@@ -193,7 +193,7 @@ class SPIForecastNotebookTool(BaseAgentTool):
                 source = nbf.v4.new_notebook()
             )
           
-        self.notebook.source.cells.extend(nbt_spi_forecast.cells)    
+        self.notebook.source.cells.extend(nbt_utils.notebook_copy(nbt_spi_forecast).cells)    
         
         
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file
@@ -214,6 +214,9 @@ class SPIForecastNotebookTool(BaseAgentTool):
         }
         self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values)
         DBI.save_notebook(self.notebook)
+        
+        # DOC: Back to a consisent state
+        self.execution_confirmed = False
         
         return {
             "notebook": jupyter_notebook

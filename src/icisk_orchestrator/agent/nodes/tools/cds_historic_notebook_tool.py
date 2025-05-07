@@ -36,8 +36,12 @@ class CDSHistoricNotebookTool(BaseAgentTool):
                 return cls[alias]
             if alias.replace('-', '_') in cls.__members__:
                 return cls[alias.replace('-', '_')]
+            if alias == f'{cls.__name__}.reanalysis_era5_land_monthly_means':
+                return cls.reanalysis_era5_land_monthly_means
             if 'month' in alias:
                 return cls.reanalysis_era5_land_monthly_means
+            if alias == f'{cls.__name__}.reanalysis_era5_land':
+                return cls.reanalysis_era5_land
             if 'hour' in alias:
                 return cls.reanalysis_era5_land
             if raise_error:
@@ -73,10 +77,6 @@ class CDSHistoricNotebookTool(BaseAgentTool):
                 return cls[alias]
             if 'prec' in alias:
                 return cls.total_precipitation
-            if 'min' in alias and 'temp' in alias:
-                return cls.min_temperature
-            if 'max' in alias and 'temp' in alias:
-                return cls.max_temperature
             if 'temp' in alias:
                 return cls.temperature
             if raise_error:
@@ -134,7 +134,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         )
         end_time: None | str = Field(
             title = "End Time",
-            description = f"The end date provided in UTC-0 YYYY-MM-DD. If not specified use: {(datetime.datetime.now() - relativedelta.relativedelta(months=-1)).strftime('%Y-%m-01')} as default.",
+            description = f"The end date provided in UTC-0 YYYY-MM-DD. It must be after the start_time arg. If not specified use: {(datetime.datetime.now() - relativedelta.relativedelta(months=-1)).strftime('%Y-%m-01')} as default.",
             examples = [
                 None,
                 "2025-02-01",
@@ -167,7 +167,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         )
         
     
-     # DOC: Additional tool args
+    # DOC: Additional tool args
     notebook: DBS.Notebook = None
 
     
@@ -215,14 +215,6 @@ class CDSHistoricNotebookTool(BaseAgentTool):
                     if ka['start_time'] is not None and ka['end_time'] is not None and utils.try_default(lambda: datetime.datetime.strptime(ka['end_time'], '%Y-%m-%d') < datetime.datetime.strptime(ka['start_time'], '%Y-%m-%d'), False) else None,
                 lambda **ka: f"Invalid end time: {ka['end_time']}. It should be at least in the previous month."
                     if ka['end_time'] is not None and datetime.datetime.strptime(ka['end_time'], '%Y-%m-%d') > datetime.datetime.now().replace(day=1) else None
-            ],
-            'zarr_output': [
-                lambda **ka: f"Invalid output path: {ka['zarr_output']}. It should be a valid zarr file path."
-                    if ka['zarr_output'] is not None and not ka['zarr_output'].lower().endswith('.zarr') else None
-            ],
-            'jupyter_notebook': [
-                lambda **ka: f"Invalid notebook path: {ka['jupyter_notebook']}. It should be a valid jupyter notebook file path."
-                    if ka['jupyter_notebook'] is not None and not ka['jupyter_notebook'].lower().endswith('.ipynb') else None
             ]
         }
         
@@ -238,6 +230,10 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         def infer_historic_variables(**ka):
             def alias_to_enum(historic_variables):
                 return [self.InputHistoricVariable.from_str(hc_var, raise_error=True) for hc_var in historic_variables]
+            def unique_variables(historic_variables):
+                return list(set(historic_variables))
+            historic_variables = alias_to_enum(ka['historic_variables'])
+            historic_variables = unique_variables(historic_variables)
             return alias_to_enum(ka['historic_variables'])
         
         def infer_area(**ka):
@@ -251,7 +247,18 @@ class CDSHistoricNotebookTool(BaseAgentTool):
                     )
                     self.execution_confirmed = False
                 return area
-            return bounding_box_from_location_name(ka['area'])
+            def round_bounding_box(area):
+                if type(area) is list:
+                    area = [
+                        utils.floor_decimals(area[0], 1),
+                        utils.floor_decimals(area[1], 1),
+                        utils.ceil_decimals(area[2], 1),
+                        utils.ceil_decimals(area[3], 1)
+                    ]
+                return area
+            area = bounding_box_from_location_name(ka['area'])
+            area = round_bounding_box(area)
+            return area
         
         def infer_start_time(**ka):
             if ka['start_time'] is None:
@@ -265,12 +272,16 @@ class CDSHistoricNotebookTool(BaseAgentTool):
         
         def infer_zarr_output(**ka):
             if ka['zarr_output'] is None:
-                return f"icisk-ai_cds-historic_{ka['historic_variables'][0]}_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.zarr"
+                return f"icisk-ai_cds-historic-{'-'.join([v.as_icisk for v in ka['historic_variables']])}_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.zarr"
+            if not ka['zarr_output'].endswith('.zarr'):
+                return f"{ka['zarr_output']}.zarr"
             return ka['zarr_output']
         
         def infer_jupyter_notebook(**ka):
             if ka['jupyter_notebook'] is None:
-                return f"icisk-ai_cds-historic_{ka['historic_variables'][0].as_str}_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
+                return f"icisk-ai_cds-historic-{'-'.join([v.as_icisk for v in ka['historic_variables']])}_{datetime.datetime.now().isoformat(timespec='seconds').replace(':','-')}.ipynb"
+            if not ka['jupyter_notebook'].endswith('.ipynb'):
+                return f"{ka['jupyter_notebook']}.ipynb"
             return ka['jupyter_notebook']
         
         return {
@@ -293,7 +304,7 @@ class CDSHistoricNotebookTool(BaseAgentTool):
                 authors = self.graph_state.get('user_id'),
                 source = nbf.v4.new_notebook()
             )
-        self.notebook.source.cells.extend(nbt_cds_historic.cells)
+        self.notebook.source.cells.extend(nbt_utils.notebook_copy(nbt_cds_historic).cells)
         
         
     # DOC: Execute the tool → Build notebook, write it to a file and return the path to the notebook and the zarr output file
@@ -317,9 +328,24 @@ class CDSHistoricNotebookTool(BaseAgentTool):
             'zarr_output': zarr_output,
             
             'historic_variables_icisk': [self.InputHistoricVariable(var).as_icisk for var in historic_variables],
+            
+            'dataset_var_name': f"dataset_cds_historic_{'_'.join([self.InputHistoricVariable(var).as_icisk for var in historic_variables])}",
         }
+        nb_values['dataset_var_description'] = utils.dedent(f"""
+             \"\"\"
+            Object "{nb_values['dataset_var_name']}" is a xarray.Dataset containing historic values from {start_time} to {end_time} for this bounding-box: {area}.
+            It has four dimensions named:
+            - 'time': historic timesteps
+            - 'lat': list of latitudes, 
+            - 'lon': list of longitudes,
+            It has these variables: {[self.InputHistoricVariable(var).as_icisk for var in historic_variables]} representing the {[self.InputHistoricVariable(var).as_cds for var in historic_variables]} historic data values. Variables have a shape of [time, lat, lon].
+            \"\"\"
+        """, add_tab=2, tab_first=False)
         self.notebook.source = nbt_utils.write_notebook_template(self.notebook.source, values_dict=nb_values, mode=nb_values['historic_dataset'])   # DOC: We write different code section based on dataset  
         DBI.save_notebook(self.notebook)
+        
+        # DOC: Back to a consisent state
+        self.execution_confirmed = False
         
         return {
             "data_source": zarr_output,

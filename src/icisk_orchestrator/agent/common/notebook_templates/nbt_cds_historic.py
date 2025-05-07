@@ -14,10 +14,12 @@ notebook_template.cells.extend([
 
         import os
         import json
+        import time
         import datetime
         import requests
         import getpass
         import pprint
+        from calendar import monthrange
 
         import numpy as np
         import pandas as pd
@@ -40,7 +42,7 @@ notebook_template.cells.extend([
         # Section "Define constant"
         
         # CDS Dataset name
-        dataset_name = {historic_dataset}
+        dataset_name = '{historic_dataset}'
 
         # Forcast variables
         historic_variables = {historic_variables}
@@ -86,7 +88,7 @@ notebook_template.cells.extend([
                         "download_format": "unarchived"
                     },
                     "token": "YOUR-ICISK-API-TOKEN",
-                    "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_output.replace('.zarr', f'-{fc_var}')}.zarr",
+                    "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_output.replace('.zarr', f'-{hist_var}')}.zarr",
                 }
             }
 
@@ -141,7 +143,7 @@ notebook_template.cells.extend([
                 icisk_api_payload = {
                     "inputs": {
                         "dataset": dataset_name,
-                        "file_out": f"/tmp/{zarr_output.replace('.zarr', '.nc')}",
+                        "file_out": f"/tmp/{zarr_output.replace('.zarr', f'-{hist_var}')}.nc",
                         "query": {
                             "variable": [hist_var],
                             "year": str(year_month.year),
@@ -158,7 +160,7 @@ notebook_template.cells.extend([
                             "download_format": "unarchived"
                         },
                         "token": "YOUR-ICISK-API-TOKEN",
-                        "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_output}",
+                        "zarr_out": f"s3://saferplaces.co/test/icisk/ai-agent/{zarr_output.replace('.zarr', f'-{hist_var}')}.zarr",
                     }
                 }
 
@@ -174,7 +176,7 @@ notebook_template.cells.extend([
                 icisk_api_payload['inputs']['token'] = icisk_api_token
 
                 # Call API
-                root_url = 'https://c0ca-95-255-158-119.ngrok-free.app' # 'https://i-cisk.dev.52north.org/ingest'
+                root_url = 'https://i-cisk.dev.52north.org/ingest'
                 icisk_api_response = requests.post(
                     url = f'{root_url}/processes/ingestor-cds-process/execution',
                     headers = { 'Prefer': 'respond-async' },
@@ -200,14 +202,14 @@ notebook_template.cells.extend([
         timesleep = 30
 
         while any([job_response['result']==None for job_response in job_responses.values()]):
-            for fc_var,job_response in job_responses.items():
+            for hist_var,job_response in job_responses.items():
                 if job_response['result'] is None:
                     job_status = requests.get(f'{root_url}/jobs/{job_response["job_id"]}?f=json').json()['status']
                     if job_status in ["failed", "successful", "dismissed"]:
                         job_response['result'] = requests.get(f'{root_url}/jobs/{job_response["job_id"]}/results?f=json').json()
-                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} is {job_status}')
+                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {hist_var} is {job_status}')
                     else:
-                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {fc_var} status is "{job_status}" - retring in {timesleep} seconds')
+                        print(f'> {datetime.datetime.now().strftime("%H:%M:%S")} - {hist_var} status is "{job_status}" - retring in {timesleep} seconds')
             if any([job_response['result']==None for job_response in job_responses.values()]):
                 time.sleep(timesleep)
     """),
@@ -258,28 +260,19 @@ notebook_template.cells.extend([
             )
             dataset_list.append(dataset)
 
-        dataset_cds_historic = xr.merge(dataset_list).sortby(['time', 'lat', 'lon'])
+        {dataset_var_name} = xr.merge(dataset_list).sortby(['time', 'lat', 'lon'])
     """,
     metadata = { CellMetadata.NEED_FORMAT: True }),
     
     nbf.v4.new_code_cell("""
-        # Section "Describe dataset_cds_historic"
+        # Section "Describe {dataset_var_name}"
 
-        \"\"\"
-        Object "dataset_cds_historic" is a xarray.Dataset
-        It has four dimensions named:
-        - 'time': historic timesteps
-        - 'lat': list of latitudes, 
-        - 'lon': list of longitudes,
-        It has these variables: {historic_variables_icisk} representing the {historic_variables} historic data values. Variables have a shape of [time, lat, lon].
-        \"\"\"
+        {dataset_var_description}
 
-        # Use the dataset_cds_historic variable to do next analysis or plots
+        # Use the {dataset_var_name} variable to do next analysis or plots
 
-        display(dataset_cds_historic)
+        display({dataset_var_name})
     """, 
     metadata={ CellMetadata.NEED_FORMAT: True })
-    
-    
     
 ])
