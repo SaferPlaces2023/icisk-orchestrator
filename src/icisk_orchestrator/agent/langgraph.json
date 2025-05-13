@@ -3,6 +3,11 @@
     "graphs": {
       "agent": "./src/icisk_orchestrator/agent/graph.py:graph"
     },
-    "env": ".env"
+    "env":{
+      "MONGODB_DOMAIN":"mongodb://db:27017/",
+      "OPENAI_API_KEY":"",
+      "LANGSMITH_API_KEY":"",
+      "LANGSMITH_PROJECT":"new-agent"
+    }
 }
   

@@ -4,8 +4,8 @@ FROM python:3.11-slim
 COPY . /app
 WORKDIR /app
 
-RUN pip install .
+RUN pip install -e .
 # RUN pip install -U "langgraph-cli[inmem]"
-EXPOSE 2024
+EXPOSE 8501
 
-CMD ["python","/app/src/launch.py"]
+CMD ["python","/app/src/icisk_orchestrator/webapp/launch_webapp.py"]

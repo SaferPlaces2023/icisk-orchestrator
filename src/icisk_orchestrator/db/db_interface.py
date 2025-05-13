@@ -7,11 +7,11 @@ from bson import ObjectId
 import nbformat as nbf
 
 from db import DBS, db_utils
-
+import os
 # DB general
 
 _DB_NAME = 'icisk_orchestrator_db'   # TODO: Change to env var
-_CONNECTION_STRING = 'mongodb://localhost:27017/'   # TODO: Change to env var
+_CONNECTION_STRING = os.environ.get("MONGODB_DOMAIN",'mongodb://localhost:27017/') #'mongodb://localhost:27017/'   # TODO: Change to env var
 
 class DatabaseInterface():    
     
@@ -19,11 +19,18 @@ class DatabaseInterface():
     db = None
     
     def __init__(self):
+        print('Initializing DatabaseInterface')
+        print(f'Connection string: {_CONNECTION_STRING}')
+        print(f'Database name: {_DB_NAME}')
         self.connection_string = _CONNECTION_STRING
         self.db_name = _DB_NAME
         
         
     def connect(self):
+        print('Connecting to database')
+        print(f'Connection string: {self.connection_string}')
+        print(f'Database name: {self.db_name}')
+
         if self.client is None:
             self.client = MongoClient(self.connection_string)
             self.db = self.client[self.db_name]
@@ -129,6 +136,9 @@ class DatabaseInterface():
         Returns:
             dict: User document.
         """
+        print("USER BY ID")
+        print(f'User ID: {user_id}')
+        print(f'User ID type: {type(user_id)}')
         
         self.connect()
         

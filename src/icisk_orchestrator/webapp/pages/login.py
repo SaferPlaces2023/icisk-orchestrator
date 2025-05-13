@@ -16,7 +16,9 @@ def validate_login(user_id: str):
     """
     Validate the user ID and set up the session.
     """
+    print(f"Validating user ID: {user_id}")
     user = DBI.user_by_id(user_id)
+    print(f"User: {user}")
     if user is not None:
         return True
     else:

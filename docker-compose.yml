@@ -1,0 +1,40 @@
+services:
+  db:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./db_data:/data/db
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile_agent
+    restart: always
+    ports:
+      - "2024:2024"
+    depends_on:
+      - db
+    environment:
+      - MONGODB_DOMAIN=mongodb://db:27017/
+      - OPENAI_API_KEY=
+      - LANGSMITH_API_KEY=
+      - LANGSMITH_PROJECT=new-agent
+    # volumes:
+    #   - ./src
+  # webapp:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile_webapp
+  #   restart: always
+  #   ports:
+  #     - "8501:8501"
+  #   depends_on:
+  #     - db
+  #     - agent
+  #   environment:
+  #     - OPENAI_API_KEY=
+  #     - MONGODB_DOMAIN=mongodb://db:27017/
+  #     - LANGGRAPH_HOST=http://agent:2024
+  #     - LANGSMITH_API_KEY=
+  #     - LANGSMITH_PROJECT=new-agent
+      

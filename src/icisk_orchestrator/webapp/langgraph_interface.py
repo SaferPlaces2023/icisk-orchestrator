@@ -1,10 +1,14 @@
 from langgraph_sdk.client import get_client, LangGraphClient, Command
-
+import os
 # from icisk_chat.logger import Logger, fmsg
 
+LANGGRAPH_HOST = os.environ.get("LANGGRAPH_HOST", "http://localhost:2024")
 
 def get_langgraph_client():
-    client = get_client(url="http://localhost:2024")    # TODO: set url to env variable
+    print(f"Connecting to LangGraph at {LANGGRAPH_HOST}")
+    client = get_client(url=LANGGRAPH_HOST)    # TODO: set url to env variable
+    print(f"Connected to LangGraph at {LANGGRAPH_HOST}")
+    print(f"Client: {client}")
     return client
 
     

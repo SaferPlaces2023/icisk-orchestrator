@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+# WORKDIR /notebook
+COPY . /app
+WORKDIR /app
+
+RUN pip install -e .
+# RUN pip install -U "langgraph-cli[inmem]"
+EXPOSE 2024
+
+CMD ["langgraph", "dev", "--port","2024","--host","0.0.0.0", "--config", "src/icisk_orchestrator/agent/langgraph.json"]
