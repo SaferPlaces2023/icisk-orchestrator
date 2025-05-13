@@ -1,7 +1,11 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # WORKDIR /notebook
+COPY . /app
+WORKDIR /app
 
-RUN pip install jupyter jupyter_client nbformat
+RUN pip install .
+# RUN pip install -U "langgraph-cli[inmem]"
+EXPOSE 2024
 
-# CMD ["jupyter-notebook"]
+CMD ["python","/app/src/launch.py"]

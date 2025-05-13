@@ -13,8 +13,8 @@ if __name__ == "__main__":
     ]
     run_langraph = " && ".join(run_langraph_commands)
     
-    langgrpah_process = subprocess.run(run_langraph_commands[1], shell = True)
-    # langgraph_process = subprocess.run(f'start "langgraph agent" cmd /k "{run_langraph}"', shell = True)
+    # langgrpah_process = subprocess.run(run_langraph_commands[1], shell = True)
+    langgraph_process = subprocess.run(f'start "langgraph agent" cmd /k "{run_langraph}"', shell = True)
     
     
     # DOC: Wait for langgraph server to start
@@ -28,5 +28,5 @@ if __name__ == "__main__":
     ]
     run_streamlit = " && ".join(run_streamlit_commands)
     
-    streamlit_process = subprocess.run(run_streamlit_commands[1], shell = True)
-    # streamlit_process = subprocess.run(f'start "streamlit app" cmd /k "{run_streamlit}"', shell = True)
+    # streamlit_process = subprocess.run(run_streamlit_commands[1], shell = True)
+    streamlit_process = subprocess.run(f'start "streamlit app" cmd /k "{run_streamlit}"', shell = True)
