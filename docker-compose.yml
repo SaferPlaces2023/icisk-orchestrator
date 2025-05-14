@@ -1,40 +1,72 @@
+volumes:
+    langgraph-data:
+        driver: local
 services:
-  db:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    volumes:
-      - ./db_data:/data/db
-  agent:
-    build:
-      context: .
-      dockerfile: Dockerfile_agent
-    restart: always
-    ports:
-      - "2024:2024"
-    depends_on:
-      - db
-    environment:
-      - MONGODB_DOMAIN=mongodb://db:27017/
-      - OPENAI_API_KEY=
-      - LANGSMITH_API_KEY=
-      - LANGSMITH_PROJECT=new-agent
-    # volumes:
-    #   - ./src
-  # webapp:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile_webapp
-  #   restart: always
-  #   ports:
-  #     - "8501:8501"
-  #   depends_on:
-  #     - db
-  #     - agent
-  #   environment:
-  #     - OPENAI_API_KEY=
-  #     - MONGODB_DOMAIN=mongodb://db:27017/
-  #     - LANGGRAPH_HOST=http://agent:2024
-  #     - LANGSMITH_API_KEY=
-  #     - LANGSMITH_PROJECT=new-agent
-      
+    # db:
+    #     image: mongo:latest
+    #     ports:
+    #     - "27017:27017"
+    #     volumes:
+    #     - ./db_data:/data/db
+    db:
+        build: ./db_service
+        ports:
+        - "27017:27017"
+        volumes:
+        - ./db_data:/data/db
+        environment:
+        - MONGODB_DOMAIN=mongodb://db:27017/
+    langgraph-api:
+        image: "test_agent:local"
+        ports:
+            - "8001:8000"
+        depends_on:
+            langgraph-redis:
+                condition: service_healthy
+            langgraph-postgres:
+                condition: service_healthy
+        environment:
+            MONGODB_DOMAIN: mongodb://db:27017/
+            REDIS_URI: redis://langgraph-redis:6379
+            OPENAI_API_KEY: 
+            LANGSMITH_API_KEY: 
+            POSTGRES_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
+    webapp:
+        build:
+            context: .
+            dockerfile: Dockerfile_webapp
+        restart: always
+        ports:
+        - "8502:8501"
+        depends_on:
+        - db
+        - langgraph-api
+        environment:
+        - OPENAI_API_KEY=
+        - MONGODB_DOMAIN=mongodb://db:27017/
+        - LANGGRAPH_HOST=http://langgraph-api:8000
+        - LANGSMITH_API_KEY=
+        - LANGSMITH_PROJECT=new-agent
+    langgraph-redis:
+        image: redis:6
+        healthcheck:
+            test: redis-cli ping
+            interval: 5s
+            timeout: 1s
+            retries: 5
+    langgraph-postgres:
+        image: postgres:16
+        ports:
+            - "5433:5432"
+        environment:
+            POSTGRES_DB: postgres
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        volumes:
+            - langgraph-data:/var/lib/postgresql/data
+        healthcheck:
+            test: pg_isready -U postgres
+            start_period: 10s
+            timeout: 1s
+            retries: 5
+            interval: 5s

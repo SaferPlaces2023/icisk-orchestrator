@@ -1,4 +1,4 @@
-FROM mongo:latest
+FROM python:3.11-slim
 
 # Installa Python
 RUN apt-get update && \
