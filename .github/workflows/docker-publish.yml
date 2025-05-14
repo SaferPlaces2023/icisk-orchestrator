@@ -22,13 +22,6 @@ permissions:
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
-    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
-      #
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,11 +59,18 @@ jobs:
             docker push ${IMAGE_FULL_NAME}:$TAG
             docker push ${IMAGE_FULL_NAME}:latest
       
+      - name: Get image digest
+        id: digest
+        run: |
+          IMAGE=${{ env.REGISTRY }}/$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]'):${GITHUB_SHA::8}
+          DIGEST=$(docker push $IMAGE | tee /dev/stderr | grep "digest:" | awk '{print $3}')
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+
       # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
           push-to-registry: true
       
