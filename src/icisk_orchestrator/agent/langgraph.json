@@ -2,12 +2,6 @@
     "dependencies": ["./../../../"],
     "graphs": {
       "agent": "./graph.py:graph"
-    },
-    "env":{
-      "MONGODB_DOMAIN":"mongodb://db:27017/",
-      "OPENAI_API_KEY":"",
-      "LANGSMITH_API_KEY":"",
-      "LANGSMITH_PROJECT":"new-agent"
     }
 }
   
