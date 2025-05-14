@@ -51,12 +51,12 @@ jobs:
         run: |
             pip install .
             echo "Building and pushing Docker image with tag: $TAG"
-            langgraph build --tag $IMAGE_NAME:${GITHUB_SHA::8} --config ./src/icisk_orchestrator/agent/langgraph.json
-            docker tag $IMAGE_NAME:${GITHUB_SHA::8} $IMAGE_NAME:$TAG
-            docker tag $IMAGE_NAME:${GITHUB_SHA::8} $IMAGE_NAME:latest
-            docker push $IMAGE_NAME:${GITHUB_SHA::8}
-            docker push $IMAGE_NAME:$TAG
-            docker push $IMAGE_NAME:latest
+            langgraph build --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA::8} --config ./src/icisk_orchestrator/agent/langgraph.json
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA::8} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA::8} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA::8}
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       
       # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
       - name: Generate artifact attestation
