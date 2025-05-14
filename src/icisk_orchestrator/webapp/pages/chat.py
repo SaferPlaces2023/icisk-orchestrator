@@ -9,7 +9,6 @@ import nbformat as nbf
 import nest_asyncio; nest_asyncio.apply()
 import asyncio
 import streamlit as st
-from st_copy_to_clipboard import st_copy_to_clipboard
 
 from webapp import utils
 from webapp import langgraph_interface as lgi

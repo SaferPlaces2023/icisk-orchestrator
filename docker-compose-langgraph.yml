@@ -2,26 +2,49 @@ volumes:
     langgraph-data:
         driver: local
 services:
+    # db:
+    #     image: mongo:latest
+    #     ports:
+    #     - "27017:27017"
+    #     volumes:
+    #     - ./db_data:/data/db
     db:
-        image: mongo:latest
+        build: ./db_service
         ports:
         - "27017:27017"
         volumes:
         - ./db_data:/data/db
+        environment:
+        - MONGODB_DOMAIN=mongodb://db:27017/
+    langgraph-api:
+        image: "test_agent:local"
+        ports:
+            - "8001:8000"
+        depends_on:
+            langgraph-redis:
+                condition: service_healthy
+            langgraph-postgres:
+                condition: service_healthy
+        environment:
+            MONGODB_DOMAIN: mongodb://db:27017/
+            REDIS_URI: redis://langgraph-redis:6379
+            OPENAI_API_KEY: 
+            LANGSMITH_API_KEY: 
+            POSTGRES_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
     webapp:
         build:
             context: .
             dockerfile: Dockerfile_webapp
         restart: always
         ports:
-        - "8501:8501"
+        - "8502:8501"
         depends_on:
         - db
         - langgraph-api
         environment:
         - OPENAI_API_KEY=
         - MONGODB_DOMAIN=mongodb://db:27017/
-        - LANGGRAPH_HOST=http://langgraph-api:8123
+        - LANGGRAPH_HOST=http://langgraph-api:8000
         - LANGSMITH_API_KEY=
         - LANGSMITH_PROJECT=new-agent
     langgraph-redis:
@@ -47,17 +70,3 @@ services:
             timeout: 1s
             retries: 5
             interval: 5s
-    langgraph-api:
-        image: "test_agent:local"
-        ports:
-            - "8123:8000"
-        depends_on:
-            langgraph-redis:
-                condition: service_healthy
-            langgraph-postgres:
-                condition: service_healthy
-        environment:
-            REDIS_URI: redis://langgraph-redis:6379
-            OPENAI_API_KEY: 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
-            LANGSMITH_API_KEY: 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
-            POSTGRES_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
