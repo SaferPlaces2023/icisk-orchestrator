@@ -51,7 +51,7 @@ jobs:
         run: |
             pip install .
             echo "Building and pushing Docker image with tag: $TAG"
-            langgraph build --tag $IMAGE_NAME:${GITHUB_SHA::8} --config ./src/icisk_orchestrator/agent/langgraph.json .
+            langgraph build --tag $IMAGE_NAME:${GITHUB_SHA::8} --config ./src/icisk_orchestrator/agent/langgraph.json
             docker tag $IMAGE_NAME:${GITHUB_SHA::8} $IMAGE_NAME:$TAG
             docker tag $IMAGE_NAME:${GITHUB_SHA::8} $IMAGE_NAME:latest
             docker push $IMAGE_NAME:${GITHUB_SHA::8}
