@@ -10,7 +10,7 @@ from db import DBS, db_utils
 import os
 # DB general
 
-_DB_NAME = 'icisk_orchestrator_db'   # TODO: Change to env var
+_DB_NAME = os.environ.get('MONGODB_NAME', 'icisk_orchestrator_db')
 _CONNECTION_STRING = os.environ.get("MONGODB_DOMAIN",'mongodb://localhost:27017/') #'mongodb://localhost:27017/'   # TODO: Change to env var
 
 class DatabaseInterface():    
